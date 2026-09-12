@@ -1,0 +1,6 @@
+{
+  "name": "BetterRate",
+  "description": "Know if today’s exchange rate is better or worse for your currency exchange compared with recent historical benchmarks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
