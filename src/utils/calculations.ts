@@ -1,11 +1,27 @@
-import { BenchmarkType, ComparisonInput, ComparisonResult } from '../types';
-import { AVERAGE_30D, AVERAGE_7D, TODAY_RATE } from '../data/mockRates';
+import { ComparisonInput, ComparisonResult } from '../types';
 
+/**
+ * Formats integer or whole amounts with thousand separators.
+ */
 export function formatNumberWithCommas(num: number | null | undefined): string {
   if (num === null || num === undefined || isNaN(num)) return '0';
   return new Intl.NumberFormat('en-US').format(Math.round(num));
 }
 
+/**
+ * Formats exchange rates to 2 decimal places (or integers if whole).
+ */
+export function formatRate(num: number | null | undefined): string {
+  if (num === null || num === undefined || isNaN(num)) return '0';
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: Number.isInteger(num) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(num);
+}
+
+/**
+ * Formats VND amounts into human-friendly compact strings (e.g. "59K VND", "1.25M VND").
+ */
 export function formatCompactVND(val: number | null | undefined): string {
   if (val === null || val === undefined || isNaN(val) || val === 0) return '0 VND';
   const absVal = Math.abs(val);
@@ -22,36 +38,50 @@ export function formatCompactVND(val: number | null | undefined): string {
   return `${formatNumberWithCommas(absVal)} VND`;
 }
 
-export function calculateComparison(input: ComparisonInput): ComparisonResult {
-  const todayRate = TODAY_RATE;
-  const benchmarkRate = input.benchmark === '7d' ? AVERAGE_7D : AVERAGE_30D;
-  const benchmarkName = input.benchmark === '7d' ? '7-day average' : '30-day average';
-
-  // Determine direction purely from the currency inputs
+/**
+ * Calculates deterministic rate comparison and monetary impact based on real FX rates.
+ */
+export function calculateComparison(
+  input: ComparisonInput,
+  todayRate: number,
+  benchmarkRate: number,
+  benchmarkName: string
+): ComparisonResult {
+  // Determine direction purely from currency inputs
   const isVndToSgd = input.haveCurrency === 'VND' && input.wantCurrency === 'SGD';
   const directionCode = isVndToSgd ? 'VND_TO_SGD' : 'SGD_TO_VND';
   const directionLabel = isVndToSgd ? 'Converting VND to SGD' : 'Converting SGD to VND';
 
-  // For VND → SGD (user has VND, wants SGD):
-  // A lower SGD/VND rate is more favorable (costs less VND per SGD).
-  // For SGD → VND (user has SGD, wants VND):
-  // A higher SGD/VND rate is more favorable (receives more VND per SGD).
-  const rateDifference = benchmarkRate - todayRate; // e.g. 19,850 - 19,620 = 230 VND
-  const rawPercentDiff = benchmarkRate > 0 ? (Math.abs(rateDifference) / benchmarkRate) * 100 : 0;
-  const percentFormatted = Number(rawPercentDiff.toFixed(2));
+  // Benchmark difference calculation:
+  // For VND → SGD:
+  // percentageDifference = (benchmarkRate - currentRate) / benchmarkRate * 100
+  // If currentRate < benchmarkRate: "more favorable" (lower rate means less VND spent per SGD)
+  // If currentRate > benchmarkRate: "less favorable"
+  //
+  // For SGD → VND:
+  // percentageDifference = (currentRate - benchmarkRate) / benchmarkRate * 100
+  // If currentRate > benchmarkRate: "more favorable" (higher rate means more VND received per SGD)
+  // If currentRate < benchmarkRate: "less favorable"
 
-  const isUnchanged = Math.abs(rateDifference) < 1 || percentFormatted === 0;
+  const rawPercentDiff = benchmarkRate > 0
+    ? (isVndToSgd
+        ? ((benchmarkRate - todayRate) / benchmarkRate) * 100
+        : ((todayRate - benchmarkRate) / benchmarkRate) * 100)
+    : 0;
+
+  const absPercent = Math.abs(rawPercentDiff);
+  const percentFormatted = Number(absPercent.toFixed(2));
+
+  const isUnchanged = percentFormatted === 0 || Math.abs(benchmarkRate - todayRate) < 0.0001;
 
   let isMoreFavorable = false;
   if (!isUnchanged) {
-    if (isVndToSgd) {
-      isMoreFavorable = todayRate < benchmarkRate;
-    } else {
-      isMoreFavorable = todayRate > benchmarkRate;
-    }
+    isMoreFavorable = rawPercentDiff > 0;
   }
 
-  // Interpretation headlines & plain language explanation
+  const rateDifference = benchmarkRate - todayRate;
+
+  // Wording: strictly direction-aware, objective, no forbidden promotional words ("good rate", "best time", etc.)
   let statusText = '';
   let headlineComparison = '';
   let explanation = '';
@@ -61,31 +91,31 @@ export function calculateComparison(input: ComparisonInput): ComparisonResult {
       ? 'Approximately unchanged for converting VND to SGD'
       : 'Approximately unchanged for converting SGD to VND';
     headlineComparison = 'Approximately unchanged today';
-    explanation = `Today’s rate (1 SGD = ${formatNumberWithCommas(todayRate)} VND) is virtually identical to the ${benchmarkName} (${formatNumberWithCommas(benchmarkRate)} VND). There is almost no rate difference compared with recent rates.`;
+    explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is virtually identical to the ${benchmarkName} (${formatRate(benchmarkRate)} VND). There is almost no rate difference compared with recent rates.`;
   } else if (isVndToSgd) {
     if (isMoreFavorable) {
       statusText = 'Better for converting VND to SGD';
       headlineComparison = `${percentFormatted}% more favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatNumberWithCommas(todayRate)} VND) is lower than the ${benchmarkName} (${formatNumberWithCommas(benchmarkRate)} VND). When converting VND to SGD, a lower rate means each Singapore Dollar costs you less Vietnamese Dong.`;
+      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is lower than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting VND to SGD, a lower rate means each Singapore Dollar costs you less Vietnamese Dong.`;
     } else {
       statusText = 'Less favorable for converting VND to SGD';
       headlineComparison = `${percentFormatted}% less favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatNumberWithCommas(todayRate)} VND) is higher than the ${benchmarkName} (${formatNumberWithCommas(benchmarkRate)} VND). When converting VND to SGD, a higher rate means each Singapore Dollar costs you more Vietnamese Dong.`;
+      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is higher than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting VND to SGD, a higher rate means each Singapore Dollar costs you more Vietnamese Dong.`;
     }
   } else {
     // SGD → VND
     if (isMoreFavorable) {
       statusText = 'Better for converting SGD to VND';
       headlineComparison = `${percentFormatted}% more favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatNumberWithCommas(todayRate)} VND) is higher than the ${benchmarkName} (${formatNumberWithCommas(benchmarkRate)} VND). When converting SGD to VND, a higher rate means you receive more Vietnamese Dong for each Singapore Dollar.`;
+      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is higher than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting SGD to VND, a higher rate means you receive more Vietnamese Dong for each Singapore Dollar.`;
     } else {
       statusText = 'Less favorable for converting SGD to VND';
       headlineComparison = `${percentFormatted}% less favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatNumberWithCommas(todayRate)} VND) is lower than the ${benchmarkName} (${formatNumberWithCommas(benchmarkRate)} VND). When converting SGD to VND, a lower rate means you receive less Vietnamese Dong for each Singapore Dollar.`;
+      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is lower than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting SGD to VND, a lower rate means you receive less Vietnamese Dong for each Singapore Dollar.`;
     }
   }
 
-  // Monetary calculations if amount is provided
+  // Optional monetary calculations if amount in SGD is provided
   let amountFormatted: string | null = null;
   let todayTotalVND: number | null = null;
   let todayTotalVNDFormatted: string | null = null;
@@ -112,7 +142,8 @@ export function calculateComparison(input: ComparisonInput): ComparisonResult {
     benchmarkTotalVNDFormatted = `${formatNumberWithCommas(benchmarkTotalVND)} VND`;
     benchmarkTotalVNDCompact = formatCompactVND(benchmarkTotalVND);
 
-    differenceVND = Math.abs(todayTotalVND - benchmarkTotalVND);
+    // moneyDifferenceVND = absolute value of (benchmarkRate - currentRate) * amountSGD
+    differenceVND = Math.abs(benchmarkRate - todayRate) * qty;
     differenceVNDFormatted = `${formatNumberWithCommas(differenceVND)} VND`;
     differenceVNDCompact = formatCompactVND(differenceVND);
 
@@ -160,4 +191,3 @@ export function calculateComparison(input: ComparisonInput): ComparisonResult {
     moneyDifferenceText,
   };
 }
-

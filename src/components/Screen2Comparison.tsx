@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { ComparisonInput, ComparisonResult } from '../types';
 import { SecondaryTrendChart } from './SecondaryTrendChart';
 import { CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, DollarSign, HelpCircle } from 'lucide-react';
-import { formatNumberWithCommas } from '../utils/calculations';
+import { formatNumberWithCommas, formatRate } from '../utils/calculations';
 
 interface Screen2Props {
   input: ComparisonInput;
   result: ComparisonResult;
+  dailyPoints: Array<{ date: string; close: number }>;
   onBack: () => void;
   onNext: () => void;
   onUpdateAmount: (amount: number | null) => void;
@@ -15,6 +16,7 @@ interface Screen2Props {
 export const Screen2Comparison: React.FC<Screen2Props> = ({
   input,
   result,
+  dailyPoints,
   onBack,
   onNext,
   onUpdateAmount,
@@ -111,13 +113,13 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
         </div>
       </div>
 
-      {/* Side-by-side Rate Numbers Comparison: Stacked on mobile for readability, 2-col on desktop */}
+      {/* Side-by-side Rate Numbers Comparison */}
       <div id="rate-metrics-card" className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 sm:pb-3">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
             Exchange Rate Comparison
           </span>
-          <span className="text-[11px] sm:text-xs text-slate-400">Deterministic comparison</span>
+          <span className="text-[11px] sm:text-xs text-slate-400">Deterministic calculation</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
@@ -125,7 +127,7 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
           <div id="today-rate-box" className="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200/80">
             <span className="text-xs font-medium text-slate-500 block mb-0.5 sm:mb-1">Today’s rate</span>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 font-display flex items-baseline gap-1.5 flex-wrap">
-              <span>{formatNumberWithCommas(result.todayRate)}</span>
+              <span>{formatRate(result.todayRate)}</span>
               <span className="text-xs font-sans text-slate-500 font-normal">VND</span>
             </div>
             <span className="text-[11px] text-slate-500 mt-0.5 sm:mt-1 block">per 1 SGD</span>
@@ -135,18 +137,18 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
           <div id="benchmark-rate-box" className="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200/80">
             <span className="text-xs font-medium text-slate-500 block mb-0.5 sm:mb-1">{result.benchmarkName}</span>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 font-display flex items-baseline gap-1.5 flex-wrap">
-              <span>{formatNumberWithCommas(result.benchmarkRate)}</span>
+              <span>{formatRate(result.benchmarkRate)}</span>
               <span className="text-xs font-sans text-slate-500 font-normal">VND</span>
             </div>
             <span className="text-[11px] text-slate-500 mt-0.5 sm:mt-1 block">per 1 SGD</span>
           </div>
         </div>
 
-        {/* Rate difference clarification pill (Stacked gracefully on mobile) */}
+        {/* Rate difference clarification pill */}
         <div id="rate-difference-pill" className="p-3 rounded-xl bg-slate-100/80 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <span className="text-slate-600">Rate difference:</span>
           <span className="font-bold text-slate-900">
-            {formatNumberWithCommas(Math.abs(result.rateDifference))} VND {result.rateDifference > 0 ? 'lower' : 'higher'} per SGD
+            {formatRate(Math.abs(result.rateDifference))} VND {result.rateDifference > 0 ? 'lower' : 'higher'} per SGD
           </span>
         </div>
       </div>
@@ -176,7 +178,7 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
             </button>
           </div>
 
-          {/* Highlighted Callout (Responsive vertical stacking on mobile) */}
+          {/* Highlighted Callout */}
           <div
             id="money-difference-highlight"
             className={`p-3.5 sm:p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
@@ -198,7 +200,7 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
             </div>
           </div>
 
-          {/* Side-by-side cost breakdown: Stacked on mobile to avoid number overflow */}
+          {/* Side-by-side cost breakdown */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-1">
             <div id="amount-today-total" className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
               <span className="text-xs text-slate-500 block mb-1">
@@ -284,14 +286,18 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
         </div>
       )}
 
-      {/* Secondary Information: Simple Trend Visualizer */}
+      {/* Secondary Information: Real Alpha Vantage Trend Visualizer */}
       <SecondaryTrendChart
         benchmark={input.benchmark}
+        benchmarkRate={result.benchmarkRate}
+        benchmarkLabel={result.benchmarkName}
         isMoreFavorable={isMoreFavorable}
         directionCode={result.directionCode}
+        todayRate={result.todayRate}
+        dailyPoints={dailyPoints}
       />
 
-      {/* Navigation Actions (Stacked on mobile for full comfortable tap target, side-by-side on desktop) */}
+      {/* Navigation Actions */}
       <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2.5 sm:gap-3 pt-2">
         <button
           id="back-btn-screen2"

@@ -1,21 +1,37 @@
 import React from 'react';
-import { ComparisonInput, BenchmarkType } from '../types';
-import { ArrowRightLeft, Calendar, HelpCircle, Sparkles, ArrowRight } from 'lucide-react';
-import { TODAY_RATE, AVERAGE_7D, AVERAGE_30D } from '../data/mockRates';
-import { formatNumberWithCommas } from '../utils/calculations';
+import { ComparisonInput, BenchmarkType, FxDataStatus } from '../types';
+import { ArrowRightLeft, Calendar, HelpCircle, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { formatNumberWithCommas, formatRate } from '../utils/calculations';
 
 interface Screen1Props {
   input: ComparisonInput;
   onChangeInput: (updater: (prev: ComparisonInput) => ComparisonInput) => void;
   onSubmit: () => void;
+  status: FxDataStatus;
+  errorMessage: string | null;
+  todayRate: number | null;
+  benchmark7d: number | null;
+  benchmark30d: number | null;
+  lastRefreshed: string | null;
+  timeZone: string | null;
+  onRetry: () => void;
 }
 
 export const Screen1CheckRate: React.FC<Screen1Props> = ({
   input,
   onChangeInput,
   onSubmit,
+  status,
+  errorMessage,
+  todayRate,
+  benchmark7d,
+  benchmark30d,
+  lastRefreshed,
+  timeZone,
+  onRetry,
 }) => {
   const isVndToSgd = input.haveCurrency === 'VND' && input.wantCurrency === 'SGD';
+  const isReady = status === 'success' && todayRate !== null && benchmark7d !== null && benchmark30d !== null;
 
   const handleToggleDirection = () => {
     onChangeInput((prev) => ({
@@ -58,6 +74,46 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
         </p>
       </div>
 
+      {/* Provider Status / Failure Alert */}
+      {status === 'loading' && (
+        <div
+          id="fx-loading-state"
+          className="mb-4 p-4 rounded-xl bg-slate-100/90 border border-slate-200 text-slate-700 flex items-center gap-3"
+        >
+          <RefreshCw className="w-4 h-4 text-slate-600 animate-spin shrink-0" />
+          <span className="text-xs sm:text-sm font-medium">Getting the latest exchange-rate data...</span>
+        </div>
+      )}
+
+      {status !== 'loading' && status !== 'success' && (
+        <div
+          id="fx-failure-state"
+          className="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200/90 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs sm:text-sm font-semibold">
+                {status === 'empty_data' && 'We could not find enough exchange-rate data for this comparison.'}
+                {status === 'provider_unreachable' && 'We cannot reach the exchange-rate service right now. Please try again later.'}
+                {status === 'provider_error' && (errorMessage || 'The exchange-rate provider could not complete this request.')}
+              </p>
+              {errorMessage && status !== 'provider_error' && (
+                <p className="text-[11px] text-amber-800/90 mt-0.5">{errorMessage}</p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-amber-900 text-white hover:bg-amber-800 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-2xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Form Card */}
       <div id="input-form-card" className="bg-white rounded-2xl p-4 sm:p-7 shadow-xs border border-slate-200/90 space-y-5 sm:space-y-6">
         
@@ -93,7 +149,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
               </div>
             </div>
 
-            {/* Swap Button (Prominent & easy to tap on both mobile and desktop) */}
+            {/* Swap Button */}
             <div className="sm:col-span-1 flex justify-center py-0.5 sm:py-0">
               <button
                 id="currency-swap-button"
@@ -129,7 +185,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             </div>
           </div>
 
-          {/* Direction Statement (Explicit, No Text Truncation, Natural Wrapping) */}
+          {/* Direction Statement */}
           <div
             id="currency-direction-pill"
             className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 space-y-1.5 sm:space-y-0 sm:flex sm:items-center sm:gap-2"
@@ -139,7 +195,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
               <span className="px-1.5 py-0.5 bg-white rounded border border-slate-200 font-mono font-bold text-slate-900 text-xs">
                 {input.haveCurrency}
               </span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="text-slate-400">→</span>
               <span className="px-1.5 py-0.5 bg-white rounded border border-slate-200 font-mono font-bold text-slate-900 text-xs">
                 {input.wantCurrency}
               </span>
@@ -179,11 +235,11 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
                   <span className="font-semibold text-sm text-slate-900">7-day average</span>
                 </div>
                 <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded shrink-0">
-                  {formatNumberWithCommas(AVERAGE_7D)} ₫
+                  {benchmark7d !== null ? `${formatRate(benchmark7d)} ₫` : '...'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Shows how today’s rate compares with the recent week.
+                Average of daily close rates over the last 7 calendar days.
               </p>
             </button>
 
@@ -203,11 +259,11 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
                   <span className="font-semibold text-sm text-slate-900">30-day average</span>
                 </div>
                 <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded shrink-0">
-                  {formatNumberWithCommas(AVERAGE_30D)} ₫
+                  {benchmark30d !== null ? `${formatRate(benchmark30d)} ₫` : '...'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Gives a broader view of the past month.
+                Average of daily close rates over the last 30 calendar days.
               </p>
             </button>
           </div>
@@ -237,7 +293,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             />
           </div>
 
-          {/* Quick presets (Mobile-friendly touch targets min 40px) */}
+          {/* Quick presets */}
           <div className="flex items-center gap-1.5 sm:gap-2 pt-1 flex-wrap">
             <span className="text-[11px] text-slate-500 mr-0.5">Quick amounts:</span>
             {[500, 1000, 3000, 5000].map((val) => (
@@ -273,21 +329,39 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
           </p>
         </div>
 
-        {/* Primary CTA (Full-width, tall touch target) */}
+        {/* Primary CTA */}
         <div className="pt-2">
           <button
             id="check-rate-btn"
             type="button"
             onClick={onSubmit}
-            className="w-full py-4 px-6 min-h-[52px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-base shadow-sm active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 group"
+            disabled={!isReady}
+            className={`w-full py-4 px-6 min-h-[52px] rounded-xl font-semibold text-base shadow-sm transition-all flex items-center justify-center gap-2 group ${
+              isReady
+                ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer active:scale-[0.99]'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            }`}
           >
             <span>Check today’s rate</span>
             <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
           </button>
           
           <div className="mt-2.5 text-center">
-            <span className="text-[11px] sm:text-xs text-slate-400">
-              Today’s reference: 1 SGD = {formatNumberWithCommas(TODAY_RATE)} VND (Simulated mock data)
+            <span className="text-[11px] sm:text-xs text-slate-500">
+              {todayRate !== null ? (
+                <>
+                  Today’s rate: 1 SGD = <strong>{formatRate(todayRate)} VND</strong>
+                  {lastRefreshed && (
+                    <span className="text-slate-400 block sm:inline sm:ml-1">
+                      (Refreshed {lastRefreshed} {timeZone || 'UTC'})
+                    </span>
+                  )}
+                </>
+              ) : status === 'loading' ? (
+                'Loading live exchange rate...'
+              ) : (
+                'Exchange-rate data unavailable'
+              )}
             </span>
           </div>
         </div>
@@ -303,8 +377,8 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             BetterRate calculates whether today’s exchange rate is mathematically more favorable for your specific direction:
           </p>
           <ul className="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
-            <li><strong>Converting VND to SGD</strong>: A lower rate is better because each Singapore Dollar costs fewer Vietnamese Dong.</li>
-            <li><strong>Converting SGD to VND</strong>: A higher rate is better because you receive more Vietnamese Dong for each Singapore Dollar.</li>
+            <li><strong>Converting VND to SGD</strong>: A lower rate is more favorable because each Singapore Dollar costs fewer Vietnamese Dong.</li>
+            <li><strong>Converting SGD to VND</strong>: A higher rate is more favorable because you receive more Vietnamese Dong for each Singapore Dollar.</li>
           </ul>
         </div>
       </div>

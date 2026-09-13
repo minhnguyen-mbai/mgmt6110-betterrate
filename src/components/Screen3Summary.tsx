@@ -1,7 +1,7 @@
 import React from 'react';
 import { ComparisonInput, ComparisonResult } from '../types';
 import { CheckCircle2, AlertCircle, RotateCcw, ArrowLeft, ArrowRight, HelpCircle } from 'lucide-react';
-import { formatNumberWithCommas } from '../utils/calculations';
+import { formatRate } from '../utils/calculations';
 
 interface Screen3Props {
   input: ComparisonInput;
@@ -101,7 +101,7 @@ export const Screen3Summary: React.FC<Screen3Props> = ({
           <div id="summary-row-benchmark" className="py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between text-sm gap-1">
             <span className="text-slate-500 text-xs sm:text-sm">Selected benchmark</span>
             <span className="font-semibold text-slate-900 text-xs sm:text-sm">
-              {result.benchmarkName} ({formatNumberWithCommas(result.benchmarkRate)} VND)
+              {result.benchmarkName} ({formatRate(result.benchmarkRate)} VND)
             </span>
           </div>
 
@@ -166,7 +166,7 @@ export const Screen3Summary: React.FC<Screen3Props> = ({
       <div id="disclaimer-note" className="p-4 rounded-xl bg-slate-100/60 border border-slate-200/70 text-[11px] text-slate-500 space-y-1 leading-relaxed">
         <p className="font-semibold text-slate-700">BetterRate Decision-Support Disclaimer</p>
         <p>
-          BetterRate is an exchange-rate comparison tool using transparent deterministic formulas and simulated mock data. It is not financial advice, a forex trading platform, a currency exchange service, or an investment forecast.
+          BetterRate is an exchange-rate comparison tool using transparent deterministic formulas and daily exchange-rate data. It is not financial advice, a forex trading platform, a currency exchange service, or an investment forecast.
         </p>
       </div>
     </div>

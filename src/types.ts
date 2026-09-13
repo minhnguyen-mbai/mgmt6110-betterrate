@@ -44,3 +44,40 @@ export interface DailyRatePoint {
   rate: number;
   isToday?: boolean;
 }
+
+export interface FxCurrentData {
+  from: string;
+  to: string;
+  rate: number;
+  lastRefreshed: string | null;
+  timeZone: string | null;
+}
+
+export interface BenchmarkDetail {
+  average: number;
+  observationCount: number;
+  startDate: string;
+  endDate: string;
+}
+
+export interface FxHistoryData {
+  from: string;
+  to: string;
+  lastRefreshed: string;
+  timeZone: string;
+  benchmarks: {
+    '7d': BenchmarkDetail;
+    '30d': BenchmarkDetail;
+  };
+  daily: Array<{
+    date: string;
+    close: number;
+  }>;
+}
+
+export type FxDataStatus =
+  | 'loading'
+  | 'success'
+  | 'empty_data'
+  | 'provider_error'
+  | 'provider_unreachable';
