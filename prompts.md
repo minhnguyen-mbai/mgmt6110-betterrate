@@ -1,10 +1,8 @@
 # prompts.md — BetterRate
 
-**Course:** MGMT6110 Human–AI Collaboration  
+**Course:** MGMT6110 Human–AI Collaboration 
+**Name:** Nguyen Tran Nhat Minh
 **Project:** BetterRate  
-**Purpose of this log:** chronological record of prompts, agent outputs, human checks, corrections, and manual verification used to build BetterRate.
-
-> **Note:** I kept the prompts below in chronological order. Where a step was manual verification rather than an AI prompt, I label it clearly as **Human verification / no prompt**.
 
 ---
 
