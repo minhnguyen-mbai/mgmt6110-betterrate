@@ -1,6 +1,5 @@
-# assessment.md — BetterRate
 
-**Name:** Minh  
+**Name:** Nguyen Tran Nhat Minh  
 **Course:** MGMT6110 Human-AI Collaboration  
 **Problem Set 2:** BetterRate  
 
