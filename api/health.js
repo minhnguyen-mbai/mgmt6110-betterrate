@@ -14,6 +14,8 @@ import {
   logDiagnostic,
 } from './_lib/alphavantage.js';
 
+const HEALTH_CACHE_SECONDS = 21600; // 6 hours
+
 export default async function handler(req, res) {
   // Method handling: HEAD returns 200 immediately without contacting provider; non-GET/HEAD returns 405
   if (!handleRequestMethod(req, res)) {
@@ -117,8 +119,11 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
   if (ok) {
-    // Cache successful health responses at the CDN for 5 minutes
-    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
+    // Cache successful health diagnostics at the CDN for 6 hours (no stale-while-revalidate for diagnostics)
+    res.setHeader(
+      'Cache-Control',
+      `public, max-age=0, s-maxage=${HEALTH_CACHE_SECONDS}`
+    );
   } else {
     res.setHeader('Cache-Control', 'no-store');
   }

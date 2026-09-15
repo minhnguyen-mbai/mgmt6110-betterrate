@@ -13,6 +13,20 @@ import {
   ERROR_MESSAGES,
 } from './_lib/alphavantage.js';
 
+const CURRENT_CACHE_SECONDS = 7200;   // 2 hours
+const CURRENT_STALE_SECONDS = 14400;  // 4 additional hours while revalidating
+
+/**
+ * Caching decision (human):
+ * BetterRate is a decision-support product comparing the current FX rate
+ * with daily historical averages, not a trading terminal.
+ *
+ * A 2-hour shared CDN cache substantially reduces unnecessary upstream
+ * requests while remaining appropriate for this use case.
+ *
+ * The provider's lastRefreshed timestamp remains in the API response so
+ * data freshness stays visible rather than being hidden.
+ */
 export default async function handler(req, res) {
   // 1. Method handling: HEAD returns 200 immediately without contacting provider; non-GET/HEAD returns 405
   if (!handleRequestMethod(req, res)) {
@@ -114,11 +128,11 @@ export default async function handler(req, res) {
       ? String(rawRateObj['7. Time Zone']).trim()
       : null;
 
-  // 10. Caching: 15-minute CDN cache for decision-support comparison
+  // 10. Caching: 2-hour shared CDN cache for decision-support comparison
   res.setHeader('Content-Type', 'application/json');
   res.setHeader(
     'Cache-Control',
-    'public, max-age=0, s-maxage=900, stale-while-revalidate=1800'
+    `public, max-age=0, s-maxage=${CURRENT_CACHE_SECONDS}, stale-while-revalidate=${CURRENT_STALE_SECONDS}`
   );
 
   return res.status(200).json({

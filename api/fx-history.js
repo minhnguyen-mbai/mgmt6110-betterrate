@@ -14,6 +14,19 @@ import {
   ERROR_MESSAGES,
 } from './_lib/alphavantage.js';
 
+const HISTORY_CACHE_SECONDS = 43200;  // 12 hours
+const HISTORY_STALE_SECONDS = 86400;  // 24 additional hours while revalidating
+
+/**
+ * Caching decision (human):
+ * BetterRate's historical source contains daily closing observations.
+ * Historical daily data changes much less frequently than the current-rate
+ * endpoint, so a 12-hour shared CDN cache is appropriate and substantially
+ * reduces unnecessary upstream requests.
+ *
+ * Source dates and metadata remain visible so the application does not
+ * pretend the history is newer than it actually is.
+ */
 const MIN_OBSERVATIONS = Object.freeze({
   '7d': 3,
   '30d': 15,
@@ -180,11 +193,11 @@ export default async function handler(req, res) {
   const sum30d = obs30d.reduce((acc, cur) => acc + cur.close, 0);
   const avg30d = sum30d / obs30d.length;
 
-  // 11. Caching: 6-hour CDN cache for daily historical close observations
+  // 11. Caching: 12-hour shared CDN cache for daily historical close observations
   res.setHeader('Content-Type', 'application/json');
   res.setHeader(
     'Cache-Control',
-    'public, max-age=0, s-maxage=21600, stale-while-revalidate=43200'
+    `public, max-age=0, s-maxage=${HISTORY_CACHE_SECONDS}, stale-while-revalidate=${HISTORY_STALE_SECONDS}`
   );
 
   // Return normalized data only
