@@ -8,6 +8,8 @@ interface Screen2Props {
   input: ComparisonInput;
   result: ComparisonResult;
   dailyPoints: Array<{ date: string; close: number }>;
+  currentLastRefreshed?: string | null;
+  historyLastRefreshed?: string | null;
   onBack: () => void;
   onNext: () => void;
   onUpdateAmount: (amount: number | null) => void;
@@ -17,6 +19,8 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
   input,
   result,
   dailyPoints,
+  currentLastRefreshed,
+  historyLastRefreshed,
   onBack,
   onNext,
   onUpdateAmount,
@@ -295,6 +299,8 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
         directionCode={result.directionCode}
         todayRate={result.todayRate}
         dailyPoints={dailyPoints}
+        currentLastRefreshed={currentLastRefreshed}
+        historyLastRefreshed={historyLastRefreshed}
       />
 
       {/* Navigation Actions */}

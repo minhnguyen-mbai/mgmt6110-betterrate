@@ -31,13 +31,12 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      // Parallel fetch to both endpoints
-      const [currentData, historyData] = await Promise.all([
-        fetchCurrentFx(),
-        fetchHistoryFx(),
-      ]);
-
+      // 1. Fetch current real-time rate first
+      const currentData = await fetchCurrentFx();
       setCurrentFx(currentData);
+
+      // 2. After current rate succeeds, fetch historical benchmarks
+      const historyData = await fetchHistoryFx();
       setHistoryFx(historyData);
       setStatus('success');
     } catch (err: unknown) {
@@ -154,6 +153,8 @@ export default function App() {
                   input={input}
                   result={comparisonResult}
                   dailyPoints={historyFx?.daily || []}
+                  currentLastRefreshed={currentFx?.lastRefreshed || null}
+                  historyLastRefreshed={historyFx?.lastRefreshed || null}
                   onBack={() => handleNavigateTo(1)}
                   onNext={() => handleNavigateTo(3)}
                   onUpdateAmount={handleUpdateAmount}

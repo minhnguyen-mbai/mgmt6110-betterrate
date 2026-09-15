@@ -1,13 +1,39 @@
 import { FxCurrentData, FxHistoryData } from '../types';
 
+export type FxErrorCode =
+  | 'KEY_MISSING'
+  | 'PROVIDER_UNREACHABLE'
+  | 'PROVIDER_RATE_LIMIT'
+  | 'PROVIDER_ERROR'
+  | 'EMPTY_DATA'
+  | 'INVALID_RATE'
+  | 'GENERIC';
+
+const RECOGNIZED_CODES: ReadonlySet<string> = new Set<FxErrorCode>([
+  'KEY_MISSING',
+  'PROVIDER_UNREACHABLE',
+  'PROVIDER_RATE_LIMIT',
+  'PROVIDER_ERROR',
+  'EMPTY_DATA',
+  'INVALID_RATE',
+  'GENERIC',
+]);
+
+const DEFAULT_ERROR_MESSAGES: Record<FxErrorCode, string> = {
+  KEY_MISSING: 'Live exchange rates are not available right now because the server is not fully configured.',
+  PROVIDER_UNREACHABLE: 'We cannot reach the exchange-rate service right now. Please try again later.',
+  PROVIDER_RATE_LIMIT: 'The exchange-rate provider could not complete this request.',
+  PROVIDER_ERROR: 'The exchange-rate provider could not complete this request.',
+  EMPTY_DATA: 'We could not find enough exchange-rate data for this comparison.',
+  INVALID_RATE: 'The exchange-rate provider returned an invalid exchange-rate value.',
+  GENERIC: 'An unexpected error occurred while loading exchange-rate data.',
+};
+
 export class FxApiError extends Error {
-  code: 'EMPTY_DATA' | 'PROVIDER_ERROR' | 'PROVIDER_UNREACHABLE' | 'KEY_MISSING' | 'GENERIC';
+  code: FxErrorCode;
   userMessage: string;
 
-  constructor(
-    code: 'EMPTY_DATA' | 'PROVIDER_ERROR' | 'PROVIDER_UNREACHABLE' | 'KEY_MISSING' | 'GENERIC',
-    userMessage: string
-  ) {
+  constructor(code: FxErrorCode, userMessage: string) {
     super(userMessage);
     this.name = 'FxApiError';
     this.code = code;
@@ -16,47 +42,50 @@ export class FxApiError extends Error {
 }
 
 /**
- * Parses HTTP or network error into standardized user-facing failure message.
+ * Parses HTTP, backend JSON error payloads, or network failures into standardized user-facing errors.
+ * Trusts backend sanitized error codes as primary classification.
  */
 function normalizeError(err: unknown, status?: number, payload?: any): FxApiError {
-  if (payload && payload.code === 'KEY_MISSING') {
-    return new FxApiError(
-      'KEY_MISSING',
-      'ALPHAVANTAGE_API_KEY is not configured on the server. Please provide an API key to enable live exchange rates.'
-    );
+  // 1. Primary classification: trust recognized backend error code
+  if (payload && typeof payload.code === 'string' && RECOGNIZED_CODES.has(payload.code)) {
+    const code = payload.code as FxErrorCode;
+    const message =
+      typeof payload.error === 'string' && payload.error.trim() !== ''
+        ? payload.error.trim()
+        : DEFAULT_ERROR_MESSAGES[code];
+    return new FxApiError(code, message);
   }
 
-  if (payload && payload.code === 'EMPTY_DATA') {
-    return new FxApiError(
-      'EMPTY_DATA',
-      'We could not find enough exchange-rate data for this comparison.'
-    );
+  // 2. Fallback classification: HTTP status code when payload code is missing
+  if (status !== undefined) {
+    let fallbackCode: FxErrorCode = 'PROVIDER_ERROR';
+
+    if (status === 504) {
+      fallbackCode = 'PROVIDER_UNREACHABLE';
+    } else if (status === 503 || status === 429) {
+      fallbackCode = 'PROVIDER_RATE_LIMIT';
+    } else if (status === 502) {
+      fallbackCode = 'PROVIDER_ERROR';
+    }
+
+    const message =
+      payload && typeof payload.error === 'string' && payload.error.trim() !== ''
+        ? payload.error.trim()
+        : DEFAULT_ERROR_MESSAGES[fallbackCode];
+    return new FxApiError(fallbackCode, message);
   }
 
-  if (payload && (payload.code === 'PROVIDER_UNREACHABLE' || status === 504)) {
+  // 3. Network fetch failure (browser offline, DNS failure, aborted connection)
+  if (err instanceof TypeError || (err instanceof Error && err.name === 'AbortError')) {
     return new FxApiError(
       'PROVIDER_UNREACHABLE',
-      'We cannot reach the exchange-rate service right now. Please try again later.'
-    );
-  }
-
-  if (payload && (payload.code === 'PROVIDER_ERROR' || payload.code === 'PROVIDER_RATE_LIMITED' || payload.code === 'PROVIDER_DAILY_LIMIT' || status === 502 || status === 429)) {
-    return new FxApiError(
-      'PROVIDER_ERROR',
-      payload.error || 'The exchange-rate provider could not complete this request.'
-    );
-  }
-
-  if (err instanceof TypeError && err.message.includes('fetch')) {
-    return new FxApiError(
-      'PROVIDER_UNREACHABLE',
-      'We cannot reach the exchange-rate service right now. Please try again later.'
+      DEFAULT_ERROR_MESSAGES.PROVIDER_UNREACHABLE
     );
   }
 
   return new FxApiError(
     'PROVIDER_ERROR',
-    'The exchange-rate provider could not complete this request.'
+    DEFAULT_ERROR_MESSAGES.PROVIDER_ERROR
   );
 }
 
@@ -84,8 +113,8 @@ export async function fetchCurrentFx(): Promise<FxCurrentData> {
 
   if (!payload || typeof payload.rate !== 'number' || isNaN(payload.rate) || payload.rate <= 0) {
     throw new FxApiError(
-      'EMPTY_DATA',
-      'We could not find enough exchange-rate data for this comparison.'
+      'INVALID_RATE',
+      DEFAULT_ERROR_MESSAGES.INVALID_RATE
     );
   }
 
@@ -124,7 +153,7 @@ export async function fetchHistoryFx(): Promise<FxHistoryData> {
   ) {
     throw new FxApiError(
       'EMPTY_DATA',
-      'We could not find enough exchange-rate data for this comparison.'
+      DEFAULT_ERROR_MESSAGES.EMPTY_DATA
     );
   }
 

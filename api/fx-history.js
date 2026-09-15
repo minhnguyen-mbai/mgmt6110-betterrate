@@ -6,6 +6,19 @@
  * Returns normalized benchmarks and daily points for trend visualization.
  */
 
+import {
+  handleRequestMethod,
+  fetchAlphaVantageJson,
+  classifyProviderResponse,
+  logDiagnostic,
+  ERROR_MESSAGES,
+} from './_lib/alphavantage.js';
+
+const MIN_OBSERVATIONS = Object.freeze({
+  '7d': 3,
+  '30d': 15,
+});
+
 function getCalendarStartDate(endStr, dayCount) {
   const [year, month, day] = endStr.split('-').map(Number);
   const endUtc = new Date(Date.UTC(year, month - 1, day));
@@ -14,105 +27,78 @@ function getCalendarStartDate(endStr, dayCount) {
 }
 
 export default async function handler(req, res) {
-  // Only permit GET / HEAD requests
-  if (req.method && req.method !== 'GET' && req.method !== 'HEAD') {
-    res.setHeader('Allow', 'GET, HEAD');
-    return res.status(405).json({
-      error: 'Method Not Allowed',
-      code: 'METHOD_NOT_ALLOWED',
-    });
+  // 1. Method handling: HEAD returns 200 immediately without contacting provider; non-GET/HEAD returns 405
+  if (!handleRequestMethod(req, res)) {
+    return;
   }
 
-  // 1. Verify ALPHAVANTAGE_API_KEY is configured
+  // 2. Verify ALPHAVANTAGE_API_KEY is configured
   const apiKey = process.env.ALPHAVANTAGE_API_KEY;
   if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === '') {
+    logDiagnostic('KEY_MISSING');
     res.setHeader('Cache-Control', 'no-store');
     return res.status(503).json({
-      error: 'ALPHAVANTAGE_API_KEY is missing on the server.',
+      error: ERROR_MESSAGES.KEY_MISSING,
       code: 'KEY_MISSING',
     });
   }
 
   const cleanKey = apiKey.trim();
 
-  // 2. Fetch daily historical rates from Alpha Vantage
+  // 3. Fetch daily historical rates from Alpha Vantage
   const upstreamUrl = `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=SGD&to_symbol=VND&outputsize=compact&apikey=${encodeURIComponent(
     cleanKey
   )}`;
 
-  let upstreamRes;
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+  const fetchResult = await fetchAlphaVantageJson(upstreamUrl, 9000);
 
-    upstreamRes = await fetch(upstreamUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'BetterRate/1.0',
-        Accept: 'application/json',
-      },
-    });
-    clearTimeout(timeoutId);
-  } catch (err) {
+  // 4. Handle network unreachable / timeout
+  if (fetchResult.httpStatus === null) {
+    logDiagnostic('PROVIDER_UNREACHABLE');
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({
-      error: 'We cannot reach the exchange-rate service right now. Please try again later.',
+      error: ERROR_MESSAGES.PROVIDER_UNREACHABLE,
       code: 'PROVIDER_UNREACHABLE',
     });
   }
 
-  // 3. Validate HTTP status
-  if (!upstreamRes.ok) {
+  // 5. Validate HTTP status
+  if (!fetchResult.ok) {
+    logDiagnostic('PROVIDER_ERROR', fetchResult.httpStatus);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({
-      error: 'The exchange-rate provider could not complete this request.',
+      error: ERROR_MESSAGES.PROVIDER_ERROR,
       code: 'PROVIDER_ERROR',
     });
   }
 
-  // 4. Parse JSON body
-  let data;
-  try {
-    data = await upstreamRes.json();
-  } catch (err) {
+  if (fetchResult.code === 'PROVIDER_ERROR' && fetchResult.providerCheck === 'unexpected_response') {
+    logDiagnostic('PROVIDER_ERROR', fetchResult.httpStatus);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({
-      error: 'The exchange-rate provider returned an unreadable response.',
+      error: ERROR_MESSAGES.PROVIDER_ERROR,
       code: 'PROVIDER_ERROR',
     });
   }
 
-  // 5. Detect provider-specific limitation and refusal messages
-  if (data['Error Message']) {
+  // 6. Detect provider-specific limitation and refusal messages
+  const classification = classifyProviderResponse(fetchResult.data);
+  if (classification) {
+    logDiagnostic(classification.code, fetchResult.httpStatus);
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(502).json({
-      error: 'The exchange-rate provider could not complete this request.',
-      code: 'PROVIDER_ERROR',
+    return res.status(classification.status).json({
+      error: classification.message,
+      code: classification.code,
     });
   }
 
-  if (data['Note']) {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(429).json({
-      error: 'The exchange-rate provider could not complete this request.',
-      code: 'PROVIDER_RATE_LIMIT',
-    });
-  }
-
-  if (data['Information']) {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(429).json({
-      error: 'The exchange-rate provider could not complete this request.',
-      code: 'PROVIDER_RATE_LIMIT',
-    });
-  }
-
-  // 6. Verify Time Series FX (Daily) exists
-  const timeSeries = data['Time Series FX (Daily)'];
+  // 7. Verify Time Series FX (Daily) exists
+  const timeSeries = fetchResult.data?.['Time Series FX (Daily)'];
   if (!timeSeries || typeof timeSeries !== 'object') {
+    logDiagnostic('EMPTY_DATA', fetchResult.httpStatus);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({
-      error: 'We could not find enough exchange-rate data for this comparison.',
+      error: ERROR_MESSAGES.EMPTY_DATA,
       code: 'EMPTY_DATA',
     });
   }
@@ -123,15 +109,16 @@ export default async function handler(req, res) {
     .sort();
 
   if (allDates.length === 0) {
+    logDiagnostic('EMPTY_DATA', fetchResult.httpStatus);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({
-      error: 'We could not find enough exchange-rate data for this comparison.',
+      error: ERROR_MESSAGES.EMPTY_DATA,
       code: 'EMPTY_DATA',
     });
   }
 
-  // 7. Extract Provider Metadata
-  const meta = data['Meta Data'] || {};
+  // 8. Extract Provider Metadata
+  const meta = fetchResult.data?.['Meta Data'] || {};
   const metaRefreshed =
     meta['5. Last Refreshed'] && String(meta['5. Last Refreshed']).trim() !== ''
       ? String(meta['5. Last Refreshed']).trim()
@@ -150,7 +137,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // 8. Calculate Calendar Windows
+  // 9. Calculate Calendar Windows
   // 7 calendar days ending on provider's latest historical refresh date (endDate - 6 days)
   const startDate7d = getCalendarStartDate(latestDateStr, 7);
   // 30 calendar days ending on provider's latest historical refresh date (endDate - 29 days)
@@ -176,27 +163,29 @@ export default async function handler(req, res) {
     }
   }
 
-  // Must have at least one observation in each window
-  if (obs7d.length === 0 || obs30d.length === 0) {
+  // Enforce minimum observations quality threshold
+  if (obs7d.length < MIN_OBSERVATIONS['7d'] || obs30d.length < MIN_OBSERVATIONS['30d']) {
+    logDiagnostic('EMPTY_DATA', fetchResult.httpStatus);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({
-      error: 'We could not find enough exchange-rate data for this comparison.',
+      error: ERROR_MESSAGES.EMPTY_DATA,
       code: 'EMPTY_DATA',
     });
   }
 
-  // 9. Benchmark averages
-  // Do NOT divide automatically by 7 or 30. Divide ONLY by the number of valid observations actually available.
+  // 10. Benchmark averages: divide ONLY by actual valid observation count
   const sum7d = obs7d.reduce((acc, cur) => acc + cur.close, 0);
   const avg7d = sum7d / obs7d.length;
 
   const sum30d = obs30d.reduce((acc, cur) => acc + cur.close, 0);
   const avg30d = sum30d / obs30d.length;
 
-  // 10. Cache-Control Header:
-  // 1 hour (3600s) because daily historical close data changes only once a day after market close.
+  // 11. Caching: 6-hour CDN cache for daily historical close observations
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200');
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=21600, stale-while-revalidate=43200'
+  );
 
   // Return normalized data only
   return res.status(200).json({
