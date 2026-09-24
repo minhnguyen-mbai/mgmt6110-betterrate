@@ -12,17 +12,25 @@ declare global {
   }
 }
 
+// Single fixed thread for the whole app, regardless of the current screen.
+function disqusConfig(this: { page: { url: string; identifier: string } }) {
+  this.page.url = DISQUS_PAGE_URL;
+  this.page.identifier = DISQUS_PAGE_IDENTIFIER;
+}
+
 export function DisqusComments() {
   useEffect(() => {
-    // Single fixed thread for the whole app, regardless of the current screen.
-    window.disqus_config = function () {
-      this.page.url = DISQUS_PAGE_URL;
-      this.page.identifier = DISQUS_PAGE_IDENTIFIER;
-    };
+    // Disqus already initialised (e.g. remount): re-render the same thread.
+    if (window.DISQUS) {
+      window.DISQUS.reset({ reload: true, config: disqusConfig });
+      return;
+    }
 
-    // Load embed.js only once; if it already exists, re-render the same thread.
+    // Config must exist before embed.js runs.
+    window.disqus_config = disqusConfig;
+
+    // Load embed.js only once.
     if (document.getElementById(DISQUS_SCRIPT_ID)) {
-      window.DISQUS?.reset({ reload: true, config: window.disqus_config });
       return;
     }
 
@@ -38,7 +46,8 @@ export function DisqusComments() {
     <section id="app-comments" className="w-full max-w-4xl mx-auto px-3.5 sm:px-6 pb-6 sm:pb-8">
       <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-3">
         <p className="text-sm text-slate-600">Tell us what worked for you and what did not.</p>
-        <div id="disqus_thread" />
+        {/* Disqus cannot parse Tailwind v4's oklch() colors and fails to render; give it plain hex values. */}
+        <div id="disqus_thread" style={{ color: '#334155', backgroundColor: '#ffffff' }} />
       </div>
     </section>
   );
