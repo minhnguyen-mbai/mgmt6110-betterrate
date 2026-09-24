@@ -7,6 +7,7 @@ import { ScreenIndicator } from './components/ScreenIndicator';
 import { Screen1CheckRate } from './components/Screen1CheckRate';
 import { Screen2Comparison } from './components/Screen2Comparison';
 import { Screen3Summary } from './components/Screen3Summary';
+import { DisqusComments } from './components/DisqusComments';
 import { AnimatePresence, motion } from 'motion/react';
 
 export default function App() {
@@ -183,12 +184,23 @@ export default function App() {
         </div>
       </main>
 
+      {/* Single site-wide discussion thread */}
+      <DisqusComments />
+
       {/* Subtle, Calm Footer */}
       <footer id="app-footer" className="w-full border-t border-slate-200/80 bg-white/70 py-4 px-4 text-center text-xs text-slate-400">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>BetterRate • Real-Time Alpha Vantage FX Exchange Rate Data</span>
           <span>Designed for non-trader consumers</span>
         </div>
+        <p id="privacy-notice" className="max-w-4xl mx-auto mt-3 leading-relaxed">
+          This page uses Microsoft Clarity and Disqus, which use cookies to record how visitors use the site and to host comments. By using this page you agree that we and Microsoft may collect and use this data.{' '}
+          <a href="https://www.microsoft.com/privacy/privacystatement" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Microsoft Privacy Statement</a>
+          {' · '}
+          <a href="https://disqus.com/privacy-policy/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Disqus Privacy Policy</a>
+          {' · '}
+          <a href="https://disqus.com/data-sharing-settings/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Disqus Data Sharing Settings</a>
+        </p>
       </footer>
     </div>
   );
