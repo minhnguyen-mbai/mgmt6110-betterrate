@@ -8,11 +8,7 @@ interface SecondaryTrendChartProps {
   benchmarkRate: number;
   benchmarkLabel: string;
   isMoreFavorable: boolean;
-  directionCode: 'BUY_BASE' | 'SELL_BASE';
-  baseCurrency: CurrencyCode;
   quoteCurrency: CurrencyCode;
-  haveCurrency: CurrencyCode;
-  wantCurrency: CurrencyCode;
   todayRate: number;
   dailyPoints: Array<{ date: string; close: number }>;
   historyDerivation?: 'direct' | 'inverse' | 'cross';
@@ -41,18 +37,13 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
   benchmarkRate,
   benchmarkLabel,
   isMoreFavorable,
-  directionCode,
-  baseCurrency,
   quoteCurrency,
-  haveCurrency,
-  wantCurrency,
   todayRate,
   dailyPoints,
   historyDerivation,
   historyProvider,
   currentLastRefreshed,
 }) => {
-  const base = getCurrencyInfo(baseCurrency);
   const quote = getCurrencyInfo(quoteCurrency);
   const Q = quote.code;
   const isDerived = historyDerivation === 'inverse' || historyDerivation === 'cross';
@@ -147,7 +138,7 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div>
           <span id="chart-title" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
-            30-Day Historical Trend (Secondary Reference)
+            30-day rate trend
           </span>
           <span id="chart-caption" className="text-[11px] text-slate-500 block">
             Historical daily closes vs. the {benchmarkLabel}
@@ -166,11 +157,6 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${isMoreFavorable ? 'bg-emerald-500' : 'bg-amber-500'}`} />
               Current Rate
-            </span>
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-              isMoreFavorable ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-            }`}>
-              {isMoreFavorable ? 'Favorable vs. benchmark' : 'Less favorable'}
             </span>
           </div>
           <div className="text-base font-bold text-slate-900">
@@ -353,16 +339,6 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
         )}
       </div>
 
-      {/* Plain Language Interpretation */}
-      <p id="chart-plain-explainer" className="mt-2 text-[11px] text-slate-500 leading-relaxed">
-        {directionCode === 'BUY_BASE'
-          ? (todayRate < benchmarkRate
-              ? `The current rate (${formatRate(todayRate)} ${Q}) sits below the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being below the benchmark is favorable because each ${base.name} costs fewer ${quote.plural}.`
-              : `The current rate (${formatRate(todayRate)} ${Q}) sits above the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being above the benchmark means each ${base.name} costs more ${quote.plural}.`)
-          : (todayRate < benchmarkRate
-              ? `The current rate (${formatRate(todayRate)} ${Q}) sits below the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being below the benchmark means you receive fewer ${quote.plural} than the recent average.`
-              : `The current rate (${formatRate(todayRate)} ${Q}) sits above the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being above the benchmark is favorable because you receive more ${quote.plural} for each ${base.name}.`)}
-      </p>
     </div>
   );
 };

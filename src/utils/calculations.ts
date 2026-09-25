@@ -1,13 +1,5 @@
-import { ComparisonInput, ComparisonResult, CurrencyCode } from '../types';
+import { ComparisonInput, ComparisonResult } from '../types';
 import { getCurrencyInfo, getQuotePair } from '../data/currencies';
-
-/**
- * Formats integer or whole amounts with thousand separators.
- */
-export function formatNumberWithCommas(num: number | null | undefined): string {
-  if (num === null || num === undefined || isNaN(num)) return '0';
-  return new Intl.NumberFormat('en-US').format(Math.round(num));
-}
 
 /**
  * Formats exchange rates to 2 decimal places (or integers if whole).
@@ -24,39 +16,7 @@ export function formatRate(num: number | null | undefined): string {
 }
 
 /**
- * Formats a money amount using the currency's minor units (e.g. 0 for VND/JPY, 2 for SGD).
- */
-export function formatAmount(num: number | null | undefined, currency: CurrencyCode): string {
-  if (num === null || num === undefined || isNaN(num)) return '0';
-  const { minorUnits } = getCurrencyInfo(currency);
-  if (minorUnits === 0) return formatNumberWithCommas(num);
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: minorUnits,
-    maximumFractionDigits: minorUnits,
-  }).format(num);
-}
-
-/**
- * Formats amounts into human-friendly compact strings (e.g. "59K VND", "1.25M VND", "4.52K SGD").
- */
-export function formatCompactAmount(val: number | null | undefined, currency: CurrencyCode): string {
-  if (val === null || val === undefined || isNaN(val) || val === 0) return `0 ${currency}`;
-  const absVal = Math.abs(val);
-  if (absVal >= 1_000_000) {
-    const millions = absVal / 1_000_000;
-    const formatted = Number(millions.toFixed(2));
-    return `${formatted}M ${currency}`;
-  }
-  if (absVal >= 1_000) {
-    const thousands = absVal / 1_000;
-    const formatted = Number(thousands.toFixed(getCurrencyInfo(currency).minorUnits > 0 ? 2 : 0));
-    return `${formatted}K ${currency}`;
-  }
-  return `${formatAmount(absVal, currency)} ${currency}`;
-}
-
-/**
- * Calculates deterministic rate comparison and monetary impact based on real FX rates.
+ * Calculates deterministic rate comparison based on real FX rates.
  *
  * todayRate and benchmarkRate are quoted as "1 base = X quote" for the pair's
  * market quote (see getQuotePair), e.g. 1 SGD = X VND for both VND -> SGD and SGD -> VND.
@@ -141,55 +101,6 @@ export function calculateComparison(
     }
   }
 
-  // Optional monetary calculations if amount in the base currency is provided
-  let amountFormatted: string | null = null;
-  let todayTotal: number | null = null;
-  let todayTotalFormatted: string | null = null;
-  let todayTotalCompact: string | null = null;
-
-  let benchmarkTotal: number | null = null;
-  let benchmarkTotalFormatted: string | null = null;
-  let benchmarkTotalCompact: string | null = null;
-
-  let difference: number | null = null;
-  let differenceFormatted: string | null = null;
-  let differenceCompact: string | null = null;
-  let moneyDifferenceText: string | null = null;
-
-  if (input.amount !== null && input.amount > 0) {
-    const qty = input.amount;
-    amountFormatted = `${base.symbol}${formatNumberWithCommas(qty)}`;
-
-    todayTotal = qty * todayRate;
-    todayTotalFormatted = `${formatAmount(todayTotal, quote.code)} ${quote.code}`;
-    todayTotalCompact = formatCompactAmount(todayTotal, quote.code);
-
-    benchmarkTotal = qty * benchmarkRate;
-    benchmarkTotalFormatted = `${formatAmount(benchmarkTotal, quote.code)} ${quote.code}`;
-    benchmarkTotalCompact = formatCompactAmount(benchmarkTotal, quote.code);
-
-    // moneyDifference = absolute value of (benchmarkRate - currentRate) * amount (in quote currency)
-    difference = Math.abs(benchmarkRate - todayRate) * qty;
-    differenceFormatted = `${formatAmount(difference, quote.code)} ${quote.code}`;
-    differenceCompact = formatCompactAmount(difference, quote.code);
-
-    if (isUnchanged) {
-      moneyDifferenceText = 'Approximately no difference today';
-    } else if (isBuyingBase) {
-      if (isMoreFavorable) {
-        moneyDifferenceText = `About ${differenceCompact} less today`;
-      } else {
-        moneyDifferenceText = `About ${differenceCompact} more today`;
-      }
-    } else {
-      if (isMoreFavorable) {
-        moneyDifferenceText = `About ${differenceCompact} more received today`;
-      } else {
-        moneyDifferenceText = `About ${differenceCompact} less received today`;
-      }
-    }
-  }
-
   return {
     directionLabel,
     directionCode,
@@ -205,17 +116,5 @@ export function calculateComparison(
     statusText,
     headlineComparison,
     explanation,
-    amount: input.amount,
-    amountFormatted,
-    todayTotal,
-    todayTotalFormatted,
-    todayTotalCompact,
-    benchmarkTotal,
-    benchmarkTotalFormatted,
-    benchmarkTotalCompact,
-    difference,
-    differenceFormatted,
-    differenceCompact,
-    moneyDifferenceText,
   };
 }

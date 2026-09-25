@@ -26,7 +26,7 @@ export default function App() {
     loadController.current = null;
   };
 
-  // Fetch only on "Check today's rate": never for amount or benchmark changes
+  // Fetch only on "Compare today's rate": never for benchmark changes or swaps within the same quote
   const handleCheck = useCallback(async () => {
     if (state.status === 'loading') return;
     abortInFlight();
@@ -68,7 +68,6 @@ export default function App() {
     dispatch({ type: 'SET_CURRENCY', side, code });
   const handleSwap = () => dispatch({ type: 'SWAP' });
   const handleBenchmarkChange = (benchmark: BenchmarkType) => dispatch({ type: 'SET_BENCHMARK', benchmark });
-  const handleAmountChange = (amount: number | null) => dispatch({ type: 'SET_AMOUNT', amount });
 
   const handleCheckAnother = () => {
     abortInFlight();
@@ -91,7 +90,6 @@ export default function App() {
           onChangeCurrency={handleChangeCurrency}
           onSwap={handleSwap}
           onBenchmarkChange={handleBenchmarkChange}
-          onAmountChange={handleAmountChange}
           onCheck={handleCheck}
           onCheckAnother={handleCheckAnother}
           haveSelectRef={haveSelectRef}
@@ -107,6 +105,9 @@ export default function App() {
           <span>BetterRate • Exchange-rate data from Alpha Vantage and Frankfurter</span>
           <span>Designed for non-trader consumers</span>
         </div>
+        <p id="advice-note" className="max-w-4xl mx-auto mt-3 leading-relaxed">
+          BetterRate provides exchange-rate comparison information only and is not financial advice.
+        </p>
         <p id="privacy-notice" className="max-w-4xl mx-auto mt-3 leading-relaxed">
           This page uses Microsoft Clarity and Disqus, which use cookies to record how visitors use the site and to host comments. By using this page you agree that we and Microsoft may collect and use this data.{' '}
           <a href="https://www.microsoft.com/privacy/privacystatement" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Microsoft Privacy Statement</a>

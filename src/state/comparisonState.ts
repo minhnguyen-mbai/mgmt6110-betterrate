@@ -11,11 +11,11 @@ import { calculateComparison } from '../utils/calculations';
 import { FxErrorCode } from '../services/fxApi';
 
 /**
- * One-page state: the selection, the optional amount, and the data loaded for one
- * market quote (e.g. SGD/VND serves both SGD -> VND and VND -> SGD).
+ * One-page state: the selection and the data loaded for one market quote
+ * (e.g. SGD/VND serves both SGD -> VND and VND -> SGD).
  *
- * - Data is fetched only when the user checks the rate (never for amount or benchmark
- *   changes: the history already contains both the 7-day and 30-day benchmarks).
+ * - Data is fetched only when the user compares the rate (never for benchmark changes:
+ *   the history already contains both the 7-day and 30-day benchmarks).
  * - Choosing a pair with a different market quote clears the loaded data.
  * - Every fetch carries a requestId; responses for an older request are ignored.
  */
@@ -29,7 +29,6 @@ export interface ComparisonState {
   haveCurrency: CurrencyCode;
   wantCurrency: CurrencyCode;
   benchmark: BenchmarkType;
-  amount: number | null;
   status: 'idle' | FxDataStatus;
   errorMessage: string | null;
   data: LoadedFxData | null;
@@ -40,7 +39,6 @@ export type ComparisonAction =
   | { type: 'SET_CURRENCY'; side: 'have' | 'want'; code: CurrencyCode }
   | { type: 'SWAP' }
   | { type: 'SET_BENCHMARK'; benchmark: BenchmarkType }
-  | { type: 'SET_AMOUNT'; amount: number | null }
   | { type: 'REQUEST_START' }
   | { type: 'REQUEST_SUCCESS'; requestId: number; pairKey: string; current: FxCurrentData; history: FxHistoryData }
   | { type: 'REQUEST_FAILURE'; requestId: number; code: FxErrorCode | null; message: string }
@@ -50,7 +48,6 @@ export const initialComparisonState: ComparisonState = {
   haveCurrency: 'VND',
   wantCurrency: 'SGD',
   benchmark: '7d',
-  amount: null,
   status: 'idle',
   errorMessage: null,
   data: null,
@@ -104,8 +101,6 @@ export function comparisonReducer(state: ComparisonState, action: ComparisonActi
       return withSelection(state, state.wantCurrency, state.haveCurrency);
     case 'SET_BENCHMARK':
       return { ...state, benchmark: action.benchmark };
-    case 'SET_AMOUNT':
-      return { ...state, amount: action.amount };
     case 'REQUEST_START':
       return { ...state, status: 'loading', errorMessage: null, data: null, requestId: state.requestId + 1 };
     case 'REQUEST_SUCCESS':
@@ -121,7 +116,7 @@ export function comparisonReducer(state: ComparisonState, action: ComparisonActi
       if (action.requestId !== state.requestId) return state;
       return { ...state, status: statusFromErrorCode(action.code), errorMessage: action.message, data: null };
     case 'RESET':
-      return { ...state, amount: null, status: 'idle', errorMessage: null, data: null, requestId: state.requestId + 1 };
+      return { ...state, status: 'idle', errorMessage: null, data: null, requestId: state.requestId + 1 };
     default:
       return state;
   }
@@ -142,7 +137,6 @@ export function selectComparison(state: ComparisonState): ComparisonResult | nul
       haveCurrency: state.haveCurrency,
       wantCurrency: state.wantCurrency,
       benchmark: state.benchmark,
-      amount: state.amount,
     },
     data.current.rate,
     benchmark.average,

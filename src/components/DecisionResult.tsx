@@ -1,41 +1,31 @@
 import React from 'react';
-import { BenchmarkType, ComparisonResult, CurrencyCode, FxCurrentData, FxHistoryData } from '../types';
+import { BenchmarkType, ComparisonResult, FxCurrentData, FxHistoryData } from '../types';
 import { SecondaryTrendChart } from './SecondaryTrendChart';
-import { CheckCircle2, AlertCircle, DollarSign, HelpCircle, RotateCcw, ChevronDown } from 'lucide-react';
-import { formatNumberWithCommas, formatRate } from '../utils/calculations';
+import { CheckCircle2, AlertCircle, HelpCircle, RotateCcw, ChevronDown } from 'lucide-react';
+import { formatRate } from '../utils/calculations';
 import { getCurrencyInfo } from '../data/currencies';
 
 interface DecisionResultProps {
-  haveCurrency: CurrencyCode;
-  wantCurrency: CurrencyCode;
   benchmark: BenchmarkType;
   result: ComparisonResult;
   current: FxCurrentData;
   history: FxHistoryData;
-  onAmountChange: (amount: number | null) => void;
   onCheckAnother: () => void;
 }
 
-const PRESET_AMOUNTS = [500, 1000, 3000, 5000];
-
 /**
- * The single-page answer: decision first, then the optional amount calculator,
- * the historical trend, and collapsed calculation details.
- * Everything is derived from already-loaded data; nothing here fetches.
+ * The single-page answer: the decision card, then the collapsed trend and
+ * calculation details. Everything is derived from already-loaded data; nothing here fetches.
  */
 export const DecisionResult: React.FC<DecisionResultProps> = ({
-  haveCurrency,
-  wantCurrency,
   benchmark,
   result,
   current,
   history,
-  onAmountChange,
   onCheckAnother,
 }) => {
   const isMoreFavorable = result.isMoreFavorable;
   const isUnchanged = result.isUnchanged;
-  const isBuyingBase = result.directionCode === 'BUY_BASE';
   const base = getCurrencyInfo(result.baseCurrency);
   const quote = getCurrencyInfo(result.quoteCurrency);
   const benchmarkDetail = history.benchmarks[benchmark];
@@ -43,13 +33,6 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
   // Signed difference of today's rate versus the benchmark, in quote currency per base unit
   const signedDifference = result.todayRate - result.benchmarkRate;
   const differenceText = `${signedDifference > 0 ? '+' : signedDifference < 0 ? '−' : ''}${formatRate(Math.abs(signedDifference))} ${quote.code} per ${base.code}`;
-
-  const handleAmountInput = (valStr: string) => {
-    const cleaned = valStr.replace(/[^0-9]/g, '');
-    onAmountChange(cleaned === '' ? null : parseInt(cleaned, 10));
-  };
-
-  const hasAmount = result.amount !== null && result.amount > 0;
 
   return (
     <section id="decision-result" aria-live="polite" className="w-full max-w-xl mx-auto mt-5 space-y-5">
@@ -124,126 +107,29 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
         </dl>
       </div>
 
-      {/* Optional amount calculator (secondary) */}
-      <div id="amount-calculator" className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-3">
-        <div className="flex items-center gap-2 text-slate-800">
-          <DollarSign className="w-4 h-4 text-slate-500 shrink-0" />
-          <h3 className="text-sm font-semibold">What does this mean for my amount?</h3>
-          <span className="text-[11px] text-slate-400 font-normal ml-auto">Optional</span>
-        </div>
-
-        <div className="relative">
-          <label htmlFor="amount-input" className="sr-only">
-            Amount in {base.plural} ({base.code})
-          </label>
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
-            {base.symbol}
-          </div>
-          <input
-            id="amount-input"
-            type="text"
-            inputMode="numeric"
-            placeholder="e.g. 3,000"
-            value={result.amount !== null ? formatNumberWithCommas(result.amount) : ''}
-            onChange={(e) => handleAmountInput(e.target.value)}
-            className="w-full pl-11 pr-14 py-3 min-h-[48px] rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-slate-900 text-base font-semibold placeholder:text-slate-400"
+      {/* Historical trend (collapsed by default) */}
+      <details id="trend-details" className="group bg-white rounded-2xl border border-slate-200 shadow-xs">
+        <summary className="list-none cursor-pointer select-none px-4 sm:px-6 py-3.5 flex items-center justify-between text-sm font-semibold text-slate-700 min-h-[48px]">
+          <span className="group-open:hidden">View 30-day trend</span>
+          <span className="hidden group-open:inline">Hide 30-day trend</span>
+          <ChevronDown className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="px-3 sm:px-4 pb-4">
+          <SecondaryTrendChart
+            benchmark={benchmark}
+            benchmarkRate={result.benchmarkRate}
+            benchmarkLabel={result.benchmarkName}
+            isMoreFavorable={isMoreFavorable}
+            quoteCurrency={result.quoteCurrency}
+            todayRate={result.todayRate}
+            dailyPoints={history.daily || []}
+            historyDerivation={history.derivation}
+            historyProvider={history.provider}
+            currentLastRefreshed={current.lastRefreshed}
+            historyLastRefreshed={history.lastRefreshed}
           />
-          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
-            {base.code}
-          </div>
         </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <span className="text-[11px] text-slate-500 mr-0.5">Quick amounts:</span>
-          {PRESET_AMOUNTS.map((val) => (
-            <button
-              key={val}
-              id={`preset-btn-${val}`}
-              type="button"
-              onClick={() => onAmountChange(result.amount === val ? null : val)}
-              className={`text-xs px-3 py-2 min-h-[38px] rounded-lg border font-semibold transition-all cursor-pointer active:scale-95 ${
-                result.amount === val
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              {formatNumberWithCommas(val)}
-            </button>
-          ))}
-          {result.amount !== null && (
-            <button
-              id="clear-amount-btn"
-              type="button"
-              onClick={() => onAmountChange(null)}
-              className="text-xs text-slate-500 hover:text-slate-800 underline ml-auto py-2 px-1 cursor-pointer min-h-[38px] flex items-center"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        {hasAmount ? (
-          <div
-            id="money-difference-highlight"
-            className={`p-3.5 sm:p-4 rounded-xl border space-y-3 ${
-              isUnchanged
-                ? 'bg-slate-100/90 border-slate-200 text-slate-900'
-                : isMoreFavorable
-                  ? 'bg-emerald-500/10 border-emerald-200 text-emerald-950'
-                  : 'bg-amber-500/10 border-amber-200 text-amber-950'
-            }`}
-          >
-            <div>
-              <span id="amount-context-title" className="text-xs font-medium text-slate-600 block mb-0.5">
-                {isBuyingBase
-                  ? `If you buy ${result.amountFormatted} today:`
-                  : `If you exchange ${result.amountFormatted} today:`}
-              </span>
-              <span id="prominent-money-text" className="text-lg sm:text-xl font-bold font-display tracking-tight block">
-                {result.moneyDifferenceText}
-              </span>
-              <span className="text-xs text-slate-600">Approx. {result.differenceFormatted}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <div id="amount-today-total" className="p-3 rounded-lg bg-white/80 border border-slate-200/70">
-                <span className="text-[11px] text-slate-500 block mb-0.5">
-                  {isBuyingBase ? 'Today’s estimated cost' : 'Today’s estimated payout'}
-                </span>
-                <div className="text-sm font-bold text-slate-900 break-all">{result.todayTotalFormatted}</div>
-              </div>
-              <div id="amount-benchmark-total" className="p-3 rounded-lg bg-white/80 border border-slate-200/70">
-                <span className="text-[11px] text-slate-500 block mb-0.5">At the {result.benchmarkName}</span>
-                <div className="text-sm font-bold text-slate-900 break-all">{result.benchmarkTotalFormatted}</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <p id="amount-helper-text" className="text-[11px] text-slate-500 leading-normal">
-            {isBuyingBase
-              ? `Enter how many ${base.plural} you want to purchase to estimate the ${quote.code} cost difference.`
-              : `Enter how many ${base.plural} you want to convert to estimate the ${quote.code} payout difference.`}
-          </p>
-        )}
-      </div>
-
-      {/* Historical trend (supporting evidence) */}
-      <SecondaryTrendChart
-        benchmark={benchmark}
-        benchmarkRate={result.benchmarkRate}
-        benchmarkLabel={result.benchmarkName}
-        isMoreFavorable={isMoreFavorable}
-        directionCode={result.directionCode}
-        baseCurrency={result.baseCurrency}
-        quoteCurrency={result.quoteCurrency}
-        haveCurrency={haveCurrency}
-        wantCurrency={wantCurrency}
-        todayRate={result.todayRate}
-        dailyPoints={history.daily || []}
-        historyDerivation={history.derivation}
-        historyProvider={history.provider}
-        currentLastRefreshed={current.lastRefreshed}
-        historyLastRefreshed={history.lastRefreshed}
-      />
+      </details>
 
       {/* Calculation details (collapsed by default) */}
       <details id="calculation-details" className="group bg-white rounded-2xl border border-slate-200 shadow-xs">
@@ -288,18 +174,6 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
               </dd>
             </div>
           </dl>
-          <p id="plain-language-explanation" className="leading-relaxed">{result.explanation}</p>
-          <div id="educational-note" className="p-3 rounded-lg bg-slate-50 border border-slate-200/70 space-y-1">
-            <p className="font-medium text-slate-700">How BetterRate works</p>
-            <p className="leading-relaxed">
-              BetterRate calculates whether today’s exchange rate is mathematically more favorable for your specific direction.
-              Benchmarks average the daily rates before today.
-            </p>
-            <ul className="list-disc list-inside space-y-0.5 pl-1">
-              <li><strong>Converting {quote.code} to {base.code}</strong>: A lower rate is more favorable because each {base.name} costs fewer {quote.plural}.</li>
-              <li><strong>Converting {base.code} to {quote.code}</strong>: A higher rate is more favorable because you receive more {quote.plural} for each {base.name}.</li>
-            </ul>
-          </div>
         </div>
       </details>
 

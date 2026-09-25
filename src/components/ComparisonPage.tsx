@@ -11,15 +11,14 @@ interface ComparisonPageProps {
   onChangeCurrency: (side: 'have' | 'want', code: CurrencyCode) => void;
   onSwap: () => void;
   onBenchmarkChange: (benchmark: BenchmarkType) => void;
-  onAmountChange: (amount: number | null) => void;
   onCheck: () => void;
   onCheckAnother: () => void;
   haveSelectRef?: React.Ref<HTMLSelectElement>;
 }
 
 /**
- * Single-page decision support: input, then (after "Check today's rate") the decision,
- * optional amount calculator, trend and collapsed details, then the disclaimer.
+ * Single-page decision support: input, then (after "Compare today's rate") the decision
+ * with collapsed trend and calculation details.
  */
 export const ComparisonPage: React.FC<ComparisonPageProps> = ({
   state,
@@ -27,7 +26,6 @@ export const ComparisonPage: React.FC<ComparisonPageProps> = ({
   onChangeCurrency,
   onSwap,
   onBenchmarkChange,
-  onAmountChange,
   onCheck,
   onCheckAnother,
   haveSelectRef,
@@ -55,27 +53,14 @@ export const ComparisonPage: React.FC<ComparisonPageProps> = ({
           transition={{ duration: 0.18 }}
         >
           <DecisionResult
-            haveCurrency={state.haveCurrency}
-            wantCurrency={state.wantCurrency}
             benchmark={state.benchmark}
             result={result}
             current={state.data.current}
             history={state.data.history}
-            onAmountChange={onAmountChange}
             onCheckAnother={onCheckAnother}
           />
         </motion.div>
       )}
-
-      <div className="w-full max-w-xl mx-auto mt-5">
-        {/* Product Positioning & Non-Advice Disclaimer */}
-        <div id="disclaimer-note" className="p-4 rounded-xl bg-slate-100/60 border border-slate-200/70 text-[11px] text-slate-500 space-y-1 leading-relaxed">
-          <p className="font-semibold text-slate-700">BetterRate Decision-Support Disclaimer</p>
-          <p>
-            BetterRate is an exchange-rate comparison tool using transparent deterministic formulas and daily exchange-rate data. It is not financial advice, a forex trading platform, a currency exchange service, or an investment forecast.
-          </p>
-        </div>
-      </div>
     </div>
   );
 };

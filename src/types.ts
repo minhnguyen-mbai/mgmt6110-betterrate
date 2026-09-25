@@ -16,7 +16,6 @@ export interface ComparisonInput {
   haveCurrency: CurrencyCode;
   wantCurrency: CurrencyCode;
   benchmark: BenchmarkType;
-  amount: number | null; // e.g. 3000, in units of the pair's base currency
 }
 
 export interface ComparisonResult {
@@ -37,20 +36,6 @@ export interface ComparisonResult {
   statusText: string; // "Better for converting VND to SGD" or "Less favorable for converting SGD to VND"
   headlineComparison: string; // "1.16% more favorable today" or "1.16% less favorable today"
   explanation: string; // plain language rationale
-  
-  // Monetary difference (if amount is provided): amount in base currency, totals in quote currency
-  amount: number | null;
-  amountFormatted: string | null;
-  todayTotal: number | null;
-  todayTotalFormatted: string | null;
-  todayTotalCompact: string | null;
-  benchmarkTotal: number | null;
-  benchmarkTotalFormatted: string | null;
-  benchmarkTotalCompact: string | null;
-  difference: number | null;
-  differenceFormatted: string | null;
-  differenceCompact: string | null;
-  moneyDifferenceText: string | null; // e.g. "About 690K VND less today"
 }
 
 export interface DailyRatePoint {

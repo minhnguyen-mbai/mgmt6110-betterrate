@@ -73,11 +73,10 @@ test('2. user can select the 7-day or 30-day benchmark; the result updates witho
   assert.equal(selectComparison(s)?.benchmarkName, '30-day average');
 });
 
-test('3/5/6. decision works without an amount; favorable and less favorable wording', () => {
+test('9. decision result: favorable and less favorable wording', () => {
   const usdSgd = run([{ type: 'SET_CURRENCY', side: 'have', code: 'USD' }, { type: 'SET_CURRENCY', side: 'want', code: 'SGD' }]);
   const better = selectComparison(checked(usdSgd, 1.2798, 1.2769, 1.28));
   assert.ok(better);
-  assert.equal(better.amount, null);
   assert.equal(better.statusText, 'Better for converting USD to SGD');
   assert.equal(better.headlineComparison, '0.23% more favorable today');
   assert.equal(better.todayRate, 1.2798);
@@ -90,20 +89,13 @@ test('3/5/6. decision works without an amount; favorable and less favorable word
   assert.equal(selectComparison(usdSgd), null, 'no result before the rate is checked');
 });
 
-test('7/8. amount calculator uses loaded data; amount changes never start a request', () => {
-  let s = checked(run([{ type: 'SET_CURRENCY', side: 'have', code: 'USD' }, { type: 'SET_CURRENCY', side: 'want', code: 'SGD' }]), 1.2798, 1.2769, 1.28);
-  const before = { requestId: s.requestId, status: s.status, data: s.data };
-  s = comparisonReducer(s, { type: 'SET_AMOUNT', amount: 3000 });
-  assert.equal(s.requestId, before.requestId);
-  assert.equal(s.status, before.status);
-  assert.equal(s.data, before.data, 'same loaded data object is reused');
-  const r = selectComparison(s);
-  assert.equal(r?.amountFormatted, 'US$3,000');
-  assert.equal(r?.differenceFormatted, '8.70 SGD');
-  assert.equal(r?.moneyDifferenceText, 'About 8.70 SGD more received today');
-
-  s = comparisonReducer(s, { type: 'SET_AMOUNT', amount: null });
-  assert.equal(selectComparison(s)?.moneyDifferenceText, null, 'clear amount works');
+test('10. amount feature removed: no amount state or monetary result fields', () => {
+  assert.ok(!('amount' in initialComparisonState));
+  const r = selectComparison(checked(run([{ type: 'SET_CURRENCY', side: 'have', code: 'USD' }, { type: 'SET_CURRENCY', side: 'want', code: 'SGD' }]), 1.2798, 1.2769, 1.28));
+  assert.ok(r);
+  for (const key of ['amount', 'amountFormatted', 'moneyDifferenceText', 'differenceFormatted', 'todayTotal', 'benchmarkTotal']) {
+    assert.ok(!(key in r), key);
+  }
 });
 
 test('9. swap keeps the same market quote data and flips the decision direction', () => {
@@ -180,13 +172,11 @@ test('normalized errors map to page states; loading keeps the selection', () => 
   }
 });
 
-test('"Check another rate" clears the result and amount, keeps the selection', () => {
+test('"Check another rate" clears the result, keeps the selection', () => {
   let s = checked(run([{ type: 'SET_CURRENCY', side: 'have', code: 'USD' }, { type: 'SET_CURRENCY', side: 'want', code: 'SGD' }, { type: 'SET_BENCHMARK', benchmark: '30d' }]), 1.2798, 1.2769, 1.28);
-  s = comparisonReducer(s, { type: 'SET_AMOUNT', amount: 500 });
   const reset = comparisonReducer(s, { type: 'RESET' });
   assert.equal(reset.data, null);
   assert.equal(reset.status, 'idle');
-  assert.equal(reset.amount, null);
   assert.deepEqual([reset.haveCurrency, reset.wantCurrency, reset.benchmark], ['USD', 'SGD', '30d']);
   assert.ok(reset.requestId > s.requestId, 'any in-flight response is invalidated');
 });

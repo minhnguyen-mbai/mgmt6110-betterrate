@@ -16,6 +16,7 @@ import { CurrencyCode, BenchmarkType } from '../src/types';
 
 const noop = () => {};
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
 function page(state: ComparisonState) {
   return renderToStaticMarkup(
@@ -25,15 +26,14 @@ function page(state: ComparisonState) {
       onChangeCurrency={noop}
       onSwap={noop}
       onBenchmarkChange={noop}
-      onAmountChange={noop}
       onCheck={noop}
       onCheckAnother={noop}
     />
   );
 }
 
-function loadedState(have: CurrencyCode, want: CurrencyCode, rate: number, avg7: number, avg30: number, benchmark: BenchmarkType = '7d', amount: number | null = null) {
-  let s: ComparisonState = { ...initialComparisonState, haveCurrency: have, wantCurrency: want, benchmark, amount };
+function loadedState(have: CurrencyCode, want: CurrencyCode, rate: number, avg7: number, avg30: number, benchmark: BenchmarkType = '7d') {
+  let s: ComparisonState = { ...initialComparisonState, haveCurrency: have, wantCurrency: want, benchmark };
   s = comparisonReducer(s, { type: 'REQUEST_START' });
   const pairKey = getPairKey(have, want);
   const [base, quote] = pairKey.split('/');
@@ -63,36 +63,52 @@ function loadedState(have: CurrencyCode, want: CurrencyCode, rate: number, avg7:
   });
 }
 
-test('13/14/15/16. full app: one page, no stepper, no summary screen, Disqus and privacy notice present', () => {
+test('1/2/15/16/17. full app: simplified header, one page, no disclaimer card; Disqus and privacy notice remain', () => {
   const html = renderToStaticMarkup(<App />);
   const t = text(html);
-  assert.ok(html.includes('id="comparison-page"'));
-  for (const gone of ['Screen 1 of 3', 'Screen 2 of 3', 'Screen 3 of 3', 'View summary', 'Back to rate comparison', 'Rate Comparison', 'Final Takeaway', 'Decision Summary']) {
+  assert.ok(html.includes('id="brand-title"') && t.includes('BetterRate'));
+  assert.ok(!t.includes('Simulated Data'), '"Simulated Data" removed');
+  assert.ok(!t.includes('Know if today’s rate is better for you'), 'header subtitle removed');
+  for (const gone of ['Screen 1 of 3', 'Screen 2 of 3', 'Screen 3 of 3', 'View summary', 'Final Takeaway', 'Decision Summary', 'Decision-Support Disclaimer']) {
     assert.ok(!t.includes(gone), `should not contain "${gone}"`);
   }
-  assert.ok(!html.includes('screen-indicator') && !html.includes('screen-3-summary'));
+  assert.ok(!html.includes('id="disclaimer-note"'), 'large disclaimer card removed');
+  assert.ok(t.includes('BetterRate provides exchange-rate comparison information only and is not financial advice.'));
   assert.ok(html.includes('id="app-comments"') && html.includes('id="disqus_thread"'), 'Disqus renders');
   assert.ok(html.includes('id="privacy-notice"'), 'privacy notice renders');
   assert.ok(t.includes('This page uses Microsoft Clarity and Disqus'), 'privacy text intact');
-  assert.ok(t.includes('Simulated Data'), 'header label left as is');
-  assert.ok(html.includes('id="disclaimer-note"'), 'disclaimer on the page');
 });
 
-test('1/2/17. initial input: pair selectors with all currencies, benchmark choice, no amount field, no result yet', () => {
+test('hero: heading plus one short sentence', () => {
+  const t = text(page(initialComparisonState));
+  assert.ok(t.includes('Is today’s rate better for you?'));
+  assert.ok(t.includes('Compare today’s exchange rate with recent averages before you decide.'));
+  assert.ok(!t.includes('Quick Decision Check'));
+  assert.ok(!t.includes('so you can clearly see'));
+});
+
+test('3/4/5/7/8/18. inputs: simplified headings, selectors with all currencies, benchmark choice, new CTA', () => {
   const html = page(initialComparisonState);
+  const t = text(html);
+  assert.ok(t.includes('Choose currencies'));
+  assert.ok(t.includes('Compare against'));
+  for (const gone of ['Selected pair', '1. What currencies', '2. Compare today with', 'Historical benchmark', 'Converting VND → SGD', 'Paying Vietnamese Dong to receive']) {
+    assert.ok(!t.includes(gone), `should not contain "${gone}"`);
+  }
+  assert.ok(!html.includes('id="currency-direction-pill"'));
+
   for (const id of ['i-have-select', 'i-want-select']) {
     const select = html.match(new RegExp(`<select id="${id}"[^>]*>(.*?)</select>`))?.[1] ?? '';
     const options = [...select.matchAll(/<option value="(\w+)"/g)].map((m) => m[1]);
     assert.deepEqual(options, ['SGD', 'EUR', 'GBP', 'JPY', 'AUD', 'MYR', 'THB', 'USD', 'VND']);
   }
   assert.ok(html.includes('id="currency-swap-button"'));
-  assert.ok(html.includes('id="benchmark-7d-btn"') && html.includes('id="benchmark-30d-btn"'));
   assert.match(html, /id="benchmark-7d-btn"[^>]*aria-pressed="true"/);
   assert.match(html, /id="benchmark-30d-btn"[^>]*aria-pressed="false"/);
-  assert.ok(html.includes('id="check-rate-btn"'));
-  assert.ok(!html.includes('disabled=""'), 'check button enabled without an amount');
-  assert.ok(!html.includes('id="amount-input"'), 'amount is not part of the decision setup');
-  assert.ok(!html.includes('id="decision-result"'), 'no result before checking');
+
+  assert.ok(t.includes('Compare today’s rate'));
+  assert.ok(!t.includes('Check today’s rate'));
+  assert.ok(!html.includes('id="decision-result"'), 'no result before comparing');
 });
 
 test('loading keeps the input visible and prevents repeated submission', () => {
@@ -100,6 +116,7 @@ test('loading keeps the input visible and prevents repeated submission', () => {
   const html = page(s);
   assert.ok(html.includes('id="input-form-card"'));
   assert.match(html, /id="check-rate-btn"[^>]*disabled=""/);
+  assert.ok(text(html).includes('Comparing today’s rate…'));
   assert.ok(text(html).includes('Getting the latest SGD → EUR exchange-rate data'));
 });
 
@@ -112,52 +129,78 @@ test('errors are shown on the same page', () => {
   assert.ok(!html.includes('id="decision-result"'));
 });
 
-test('4/5/6/12. result on the same page: decision, compact comparison, details collapsed', () => {
-  const html = page(loadedState('USD', 'SGD', 1.2798, 1.2769, 1.28));
+test('9/14. one decision card: decision, today, benchmark, difference; conclusion not repeated', () => {
+  const html = page(loadedState('USD', 'SGD', 1.2797, 1.2769, 1.28));
   const t = text(html);
-  assert.ok(html.includes('id="input-form-card"') && html.includes('id="decision-result"'), 'input and result on one page');
+  assert.ok(html.includes('id="input-form-card"') && html.includes('id="decision-result"'));
   assert.ok(t.includes('Better for converting USD to SGD'));
-  assert.ok(t.includes('0.23% more favorable today'));
-  assert.ok(t.includes('Today’s rate 1 USD = 1.2798 SGD'));
+  assert.ok(t.includes('0.22% more favorable today'));
+  assert.ok(t.includes('Today’s rate 1 USD = 1.2797 SGD'));
   assert.ok(t.includes('7-day average 1 USD = 1.2769 SGD'));
-  assert.ok(t.includes('Difference +0.0029 SGD per USD'));
-  assert.equal((t.match(/Better for converting USD to SGD/g) || []).length, 1, 'conclusion shown once');
+  assert.ok(t.includes('Difference +0.0028 SGD per USD'));
 
-  assert.match(html, /<details id="calculation-details"(?![^>]*\bopen\b)[^>]*>/, 'details collapsed by default');
-  assert.ok(t.includes('Show calculation details'));
-  assert.ok(t.includes('Percentage difference 0.23%'));
-  assert.ok(t.includes('Observations 5 daily rates (2026-09-18 to 2026-09-24)'));
-  assert.ok(t.includes('Frankfurter · Frankfurter daily reference rates'));
-
-  assert.ok(html.includes('id="amount-calculator"') && html.includes('id="amount-input"'), 'optional amount after result');
-  assert.ok(html.indexOf('id="primary-interpretation-card"') < html.indexOf('id="amount-calculator"'));
-  assert.ok(html.indexOf('id="amount-calculator"') < html.indexOf('id="secondary-trend-container"'));
-  assert.ok(html.indexOf('id="secondary-trend-container"') < html.indexOf('id="calculation-details"'));
-  assert.ok(html.includes('id="check-another-rate-btn"'));
+  assert.equal(count(t, 'Better for converting USD to SGD'), 1, 'decision statement shown once');
+  assert.equal(count(t, 'more favorable today'), 1, 'headline shown once');
+  assert.ok(!html.includes('id="chart-plain-explainer"'), 'chart no longer restates the decision');
+  assert.ok(!t.includes('Favorable vs. benchmark'));
+  assert.ok(!html.includes('id="plain-language-explanation"'), 'details no longer restate the decision');
+  assert.ok(!t.includes('How BetterRate works'));
 
   const worse = text(page(loadedState('USD', 'SGD', 1.27, 1.2769, 1.28)));
   assert.ok(worse.includes('Less favorable for converting USD to SGD'));
   assert.ok(worse.includes('Difference −0.0069 SGD per USD'));
 });
 
-test('7. amount calculator shows the money impact from loaded data', () => {
-  const t = text(page(loadedState('USD', 'SGD', 1.2798, 1.2769, 1.28, '7d', 3000)));
-  assert.ok(t.includes('If you exchange US$3,000 today:'));
-  assert.ok(t.includes('About 8.70 SGD more received today'));
-  assert.ok(t.includes('Clear'));
-
-  const buy = text(page(loadedState('SGD', 'EUR', 1.458, 1.4634, 1.4716, '30d', 1000)));
-  assert.ok(buy.includes('If you buy €1,000 today:'));
-  assert.ok(buy.includes('30-day average 1 EUR = 1.4716 SGD'));
+test('10. amount section no longer exists', () => {
+  const html = page(loadedState('USD', 'SGD', 1.2797, 1.2769, 1.28));
+  const t = text(html);
+  for (const id of ['amount-calculator', 'amount-input', 'preset-btn-500', 'clear-amount-btn', 'money-difference-highlight']) {
+    assert.ok(!html.includes(`id="${id}"`), id);
+  }
+  assert.ok(!t.includes('What does this mean for my amount?'));
+  assert.ok(!t.includes('Quick amounts'));
 });
 
-test('9/17. multi-currency and swapped direction render the right labels', () => {
-  const t = text(page(loadedState('EUR', 'SGD', 1.458, 1.4634, 1.4716)));
-  assert.ok(t.includes('Selected pair: EUR ↔ SGD'));
-  assert.ok(t.includes('Exchanging Euros to receive Singapore Dollars'));
-  assert.ok(t.includes('Less favorable for converting EUR to SGD'));
+test('11/12/13. trend and calculation details are collapsed disclosures, in order', () => {
+  const html = page(loadedState('USD', 'SGD', 1.2797, 1.2769, 1.2767, '30d'));
+  const t = text(html);
+
+  // Native <details>: collapsed by default (no "open"), toggled by its <summary>
+  assert.match(html, /<details id="trend-details"(?![^>]*\bopen\b)[^>]*><summary/);
+  assert.match(html, /<details id="calculation-details"(?![^>]*\bopen\b)[^>]*><summary/);
+  assert.ok(t.includes('View 30-day trend') && t.includes('Hide 30-day trend'), 'expand / collapse labels');
+  assert.ok(t.includes('Show calculation details') && t.includes('Hide calculation details'));
+
+  // The chart lives inside the collapsed trend disclosure
+  const trend = html.slice(html.indexOf('id="trend-details"'), html.indexOf('id="calculation-details"'));
+  assert.ok(trend.includes('id="secondary-trend-container"') && trend.includes('id="trend-svg"'));
+  assert.ok(trend.includes('30-day rate trend'));
+  assert.ok(!t.includes('Secondary Reference'));
+  assert.ok(trend.includes('id="current-rate-card"') && trend.includes('id="latest-close-card"'));
+  assert.ok(trend.includes('id="benchmark-reference-line"'));
+
+  // Details keep only calculation information
+  const details = text(html.slice(html.indexOf('id="calculation-details"'), html.indexOf('id="check-another-rate-btn"')));
+  assert.ok(details.includes('Percentage difference 0.23%'));
+  assert.ok(details.includes('Observations 21 daily rates (2026-08-26 to 2026-09-24)'));
+  assert.ok(details.includes('Frankfurter · Frankfurter daily reference rates'));
+  assert.ok(!details.includes('favorable'), 'no decision statement in details');
+
+  // Order: decision card -> trend -> details -> check another rate
+  const order = ['primary-interpretation-card', 'trend-details', 'calculation-details', 'check-another-rate-btn'].map((id) => html.indexOf(`id="${id}"`));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.ok(order.every((i) => i > 0));
+});
+
+test('6/18. multi-currency and swapped direction render the right decision', () => {
+  const eurSgd = text(page(loadedState('EUR', 'SGD', 1.458, 1.4634, 1.4716)));
+  assert.ok(eurSgd.includes('Less favorable for converting EUR to SGD'));
+  assert.ok(eurSgd.includes('Today’s rate 1 EUR = 1.458 SGD'));
+
+  const sgdEur = text(page(loadedState('SGD', 'EUR', 1.458, 1.4634, 1.4716)));
+  assert.ok(sgdEur.includes('Better for converting SGD to EUR'));
 
   const vnd = text(page(loadedState('VND', 'SGD', 20295.77, 20366.36, 20450.25)));
-  assert.ok(vnd.includes('Paying Vietnamese Dong to receive Singapore Dollars'));
+  assert.ok(vnd.includes('Better for converting VND to SGD'));
   assert.ok(vnd.includes('Today’s rate 1 SGD = 20,295.77 VND'));
 });
