@@ -9,10 +9,11 @@
 export const ERROR_MESSAGES = Object.freeze({
   KEY_MISSING: 'Live exchange rates are not available right now because the server is not fully configured.',
   PROVIDER_UNREACHABLE: 'We cannot reach the exchange-rate service right now. Please try again later.',
-  PROVIDER_RATE_LIMIT: 'The exchange-rate provider could not complete this request.',
+  PROVIDER_RATE_LIMIT: 'The exchange-rate provider has reached its request limit for now. Please try again later.',
   PROVIDER_ERROR: 'The exchange-rate provider could not complete this request.',
   EMPTY_DATA: 'We could not find enough exchange-rate data for this comparison.',
   INVALID_RATE: 'The exchange-rate provider returned an invalid exchange-rate value.',
+  UNSUPPORTED_CURRENCY: 'This currency is not supported yet. Please choose a currency from the list.',
 });
 
 /**
@@ -156,6 +157,32 @@ export async function fetchAlphaVantageJson(url, timeoutMs = 9000) {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export const BURST_RETRY_DELAY_MS = 1100;
+
+/**
+ * True only for the free tier's per-second burst notice ("1 request per second"),
+ * which clears after a short pause. Daily-quota and other notices return false.
+ */
+export function isPerSecondLimitNotice(data) {
+  const rawNotice = data && typeof data === 'object' ? data['Note'] || data['Information'] : null;
+  if (typeof rawNotice !== 'string') return false;
+  const text = rawNotice.toLowerCase();
+  return text.includes('per second') || text.includes('spreading out');
+}
+
+/**
+ * fetchAlphaVantageJson with at most ONE retry, and only for the per-second burst notice,
+ * after waiting BURST_RETRY_DELAY_MS. Any other notice (e.g. the daily limit) is returned as-is.
+ */
+export async function fetchAlphaVantageJsonWithBurstRetry(url, timeoutMs = 9000) {
+  const first = await fetchAlphaVantageJson(url, timeoutMs);
+  if (!first.ok || !isPerSecondLimitNotice(first.data)) {
+    return first;
+  }
+  await new Promise((resolve) => setTimeout(resolve, BURST_RETRY_DELAY_MS));
+  return fetchAlphaVantageJson(url, timeoutMs);
 }
 
 /**

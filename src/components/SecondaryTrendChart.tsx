@@ -1,15 +1,22 @@
 import React, { useState, useMemo } from 'react';
-import { BenchmarkType } from '../types';
+import { BenchmarkType, CurrencyCode } from '../types';
 import { formatRate } from '../utils/calculations';
+import { getCurrencyInfo } from '../data/currencies';
 
 interface SecondaryTrendChartProps {
   benchmark: BenchmarkType;
   benchmarkRate: number;
   benchmarkLabel: string;
   isMoreFavorable: boolean;
-  directionCode: 'VND_TO_SGD' | 'SGD_TO_VND';
+  directionCode: 'BUY_BASE' | 'SELL_BASE';
+  baseCurrency: CurrencyCode;
+  quoteCurrency: CurrencyCode;
+  haveCurrency: CurrencyCode;
+  wantCurrency: CurrencyCode;
   todayRate: number;
   dailyPoints: Array<{ date: string; close: number }>;
+  historyDerivation?: 'direct' | 'inverse' | 'cross';
+  historyProvider?: string;
   currentLastRefreshed?: string | null;
   historyLastRefreshed?: string | null;
 }
@@ -35,14 +42,31 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
   benchmarkLabel,
   isMoreFavorable,
   directionCode,
+  baseCurrency,
+  quoteCurrency,
+  haveCurrency,
+  wantCurrency,
   todayRate,
   dailyPoints,
+  historyDerivation,
+  historyProvider,
   currentLastRefreshed,
 }) => {
+  const base = getCurrencyInfo(baseCurrency);
+  const quote = getCurrencyInfo(quoteCurrency);
+  const Q = quote.code;
+  const isDerived = historyDerivation === 'inverse' || historyDerivation === 'cross';
+  const isFrankfurter = historyProvider === 'Frankfurter';
+  const seriesLabel = isFrankfurter ? 'Daily rates' : 'FX_DAILY';
+  const providerLabel = isFrankfurter
+    ? 'Frankfurter daily rates'
+    : isDerived
+      ? 'Alpha Vantage FX_DAILY · via USD'
+      : 'Alpha Vantage FX_DAILY';
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // Normalize historical points sorted chronologically (oldest to newest)
-  // Contains ONLY FX_DAILY historical close points returned by /api/fx-history
+  // Contains ONLY provider historical daily points returned by /api/fx-history
   const series = useMemo(() => {
     if (!dailyPoints || dailyPoints.length === 0) {
       return [];
@@ -78,8 +102,12 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
   // Calculate SVG bounds using exclusively historical close points and the benchmark
   const rates = series.map((d) => d.rate);
   const allHistoricalRates = rates.length > 0 ? [...rates, benchmarkRate] : [benchmarkRate];
-  const minRate = Math.min(...allHistoricalRates) - 40;
-  const maxRate = Math.max(...allHistoricalRates) + 40;
+  // Vertical padding proportional to the rate scale (works for 1.49 SGD as well as 20,000 VND)
+  const rawMin = Math.min(...allHistoricalRates);
+  const rawMax = Math.max(...allHistoricalRates);
+  const verticalPad = Math.max((rawMax - rawMin) * 0.2, rawMax * 0.0005);
+  const minRate = rawMin - verticalPad;
+  const maxRate = rawMax + verticalPad;
   const rateRange = maxRate - minRate || 1;
 
   const width = 400;
@@ -126,7 +154,7 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
           </span>
         </div>
         <span id="chart-provider-pill" className="text-[10px] font-medium bg-slate-200/70 text-slate-600 px-2 py-0.5 rounded shrink-0">
-          Alpha Vantage FX_DAILY
+          {providerLabel}
         </span>
       </div>
 
@@ -146,7 +174,7 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
             </span>
           </div>
           <div className="text-base font-bold text-slate-900">
-            {formatRate(todayRate)} <span className="text-xs font-normal text-slate-500">VND</span>
+            {formatRate(todayRate)} <span className="text-xs font-normal text-slate-500">{Q}</span>
           </div>
           <div className="text-[11px] text-slate-500 mt-0.5">
             {formattedCurrentDate ? `Last refreshed: ${formattedCurrentDate}` : 'Live quote'}
@@ -160,11 +188,11 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
               Latest Historical Close
             </span>
             <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-              FX_DAILY
+              {seriesLabel}
             </span>
           </div>
           <div className="text-base font-bold text-slate-900">
-            {lastHistoricalPoint ? formatRate(lastHistoricalPoint.rate) : '—'} <span className="text-xs font-normal text-slate-500">VND</span>
+            {lastHistoricalPoint ? formatRate(lastHistoricalPoint.rate) : '—'} <span className="text-xs font-normal text-slate-500">{Q}</span>
           </div>
           <div className="text-[11px] text-slate-500 mt-0.5">
             {lastHistoricalPoint
@@ -206,7 +234,7 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
             fontSize="10"
             fontWeight="600"
           >
-            {benchmarkLabel}: {formatRate(benchmarkRate)} VND
+            {benchmarkLabel}: {formatRate(benchmarkRate)} {Q}
           </text>
 
           {/* Historical Area fill */}
@@ -288,11 +316,11 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
       <div id="chart-legend" className="flex items-center gap-3 sm:gap-4 text-[11px] text-slate-500 mt-2.5 pt-2 border-t border-slate-200/60 flex-wrap">
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-0.5 bg-slate-700 inline-block rounded" />
-          <span>30-Day Daily Closes (FX_DAILY)</span>
+          <span>30-Day Daily Closes ({seriesLabel})</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-0.5 border-b border-dashed border-slate-400 inline-block" />
-          <span>{benchmarkLabel} ({formatRate(benchmarkRate)} VND)</span>
+          <span>{benchmarkLabel} ({formatRate(benchmarkRate)} {Q})</span>
         </div>
       </div>
 
@@ -302,12 +330,12 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
           <>
             <span className="font-medium text-slate-800">
               <span className="text-slate-500 font-normal">Daily Close ({activePoint.dateStr}): </span>
-              <strong className="text-slate-900 font-bold">{formatRate(activePoint.rate)} VND</strong>
+              <strong className="text-slate-900 font-bold">{formatRate(activePoint.rate)} {Q}</strong>
             </span>
             <span className="text-[11px] text-slate-500">
               {activePoint.rate < benchmarkRate
-                ? `${formatRate(benchmarkRate - activePoint.rate)} VND lower than ${benchmarkLabel}`
-                : `${formatRate(activePoint.rate - benchmarkRate)} VND higher than ${benchmarkLabel}`}
+                ? `${formatRate(benchmarkRate - activePoint.rate)} ${Q} lower than ${benchmarkLabel}`
+                : `${formatRate(activePoint.rate - benchmarkRate)} ${Q} higher than ${benchmarkLabel}`}
             </span>
           </>
         ) : (
@@ -315,7 +343,7 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
             <span className="font-medium text-slate-800">
               <span className="text-slate-500 font-normal">Latest Close ({lastDateLabel}): </span>
               <strong className="text-slate-900 font-bold">
-                {lastHistoricalPoint ? `${formatRate(lastHistoricalPoint.rate)} VND` : '—'}
+                {lastHistoricalPoint ? `${formatRate(lastHistoricalPoint.rate)} ${Q}` : '—'}
               </strong>
             </span>
             <span className="text-[11px] text-slate-500">
@@ -327,13 +355,13 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
 
       {/* Plain Language Interpretation */}
       <p id="chart-plain-explainer" className="mt-2 text-[11px] text-slate-500 leading-relaxed">
-        {directionCode === 'VND_TO_SGD'
+        {directionCode === 'BUY_BASE'
           ? (todayRate < benchmarkRate
-              ? `The current rate (${formatRate(todayRate)} VND) sits below the ${benchmarkLabel} (${formatRate(benchmarkRate)} VND). When converting VND to SGD, being below the benchmark is favorable because each Singapore Dollar costs fewer Vietnamese Dong.`
-              : `The current rate (${formatRate(todayRate)} VND) sits above the ${benchmarkLabel} (${formatRate(benchmarkRate)} VND). When converting VND to SGD, being above the benchmark means each Singapore Dollar costs more Vietnamese Dong.`)
+              ? `The current rate (${formatRate(todayRate)} ${Q}) sits below the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being below the benchmark is favorable because each ${base.name} costs fewer ${quote.plural}.`
+              : `The current rate (${formatRate(todayRate)} ${Q}) sits above the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being above the benchmark means each ${base.name} costs more ${quote.plural}.`)
           : (todayRate < benchmarkRate
-              ? `The current rate (${formatRate(todayRate)} VND) sits below the ${benchmarkLabel} (${formatRate(benchmarkRate)} VND). When converting SGD to VND, being below the benchmark means you receive fewer Vietnamese Dong than the recent average.`
-              : `The current rate (${formatRate(todayRate)} VND) sits above the ${benchmarkLabel} (${formatRate(benchmarkRate)} VND). When converting SGD to VND, being above the benchmark is favorable because you receive more Vietnamese Dong for each Singapore Dollar.`)}
+              ? `The current rate (${formatRate(todayRate)} ${Q}) sits below the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being below the benchmark means you receive fewer ${quote.plural} than the recent average.`
+              : `The current rate (${formatRate(todayRate)} ${Q}) sits above the ${benchmarkLabel} (${formatRate(benchmarkRate)} ${Q}). When converting ${haveCurrency} to ${wantCurrency}, being above the benchmark is favorable because you receive more ${quote.plural} for each ${base.name}.`)}
       </p>
     </div>
   );

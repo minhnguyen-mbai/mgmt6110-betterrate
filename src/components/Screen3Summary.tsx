@@ -18,7 +18,6 @@ export const Screen3Summary: React.FC<Screen3Props> = ({
 }) => {
   const isMoreFavorable = result.isMoreFavorable;
   const isUnchanged = result.isUnchanged;
-  const isVndToSgd = result.directionCode === 'VND_TO_SGD';
 
   return (
     <div id="screen-3-summary" className="w-full max-w-xl mx-auto space-y-5">
@@ -92,7 +91,7 @@ export const Screen3Summary: React.FC<Screen3Props> = ({
               <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               <span className="px-1.5 py-0.5 bg-slate-100 rounded text-xs font-mono">{input.wantCurrency}</span>
               <span className="text-slate-500 font-normal text-xs ml-0.5">
-                ({isVndToSgd ? 'VND to SGD' : 'SGD to VND'})
+                ({input.haveCurrency} to {input.wantCurrency})
               </span>
             </div>
           </div>
@@ -101,7 +100,7 @@ export const Screen3Summary: React.FC<Screen3Props> = ({
           <div id="summary-row-benchmark" className="py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between text-sm gap-1">
             <span className="text-slate-500 text-xs sm:text-sm">Selected benchmark</span>
             <span className="font-semibold text-slate-900 text-xs sm:text-sm">
-              {result.benchmarkName} ({formatRate(result.benchmarkRate)} VND)
+              {result.benchmarkName} ({formatRate(result.benchmarkRate)} {result.quoteCurrency})
             </span>
           </div>
 
@@ -125,7 +124,7 @@ export const Screen3Summary: React.FC<Screen3Props> = ({
                   {result.moneyDifferenceText}
                 </span>
                 <span className="text-xs text-slate-500">
-                  Approx. {result.differenceVNDFormatted}
+                  Approx. {result.differenceFormatted}
                 </span>
               </div>
             </div>

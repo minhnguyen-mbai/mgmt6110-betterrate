@@ -3,11 +3,14 @@ import { ComparisonInput, ComparisonResult } from '../types';
 import { SecondaryTrendChart } from './SecondaryTrendChart';
 import { CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, DollarSign, HelpCircle } from 'lucide-react';
 import { formatNumberWithCommas, formatRate } from '../utils/calculations';
+import { getCurrencyInfo } from '../data/currencies';
 
 interface Screen2Props {
   input: ComparisonInput;
   result: ComparisonResult;
   dailyPoints: Array<{ date: string; close: number }>;
+  historyDerivation?: 'direct' | 'inverse' | 'cross';
+  historyProvider?: string;
   currentLastRefreshed?: string | null;
   historyLastRefreshed?: string | null;
   onBack: () => void;
@@ -19,6 +22,8 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
   input,
   result,
   dailyPoints,
+  historyDerivation,
+  historyProvider,
   currentLastRefreshed,
   historyLastRefreshed,
   onBack,
@@ -38,6 +43,8 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
 
   const isMoreFavorable = result.isMoreFavorable;
   const isUnchanged = result.isUnchanged;
+  const base = getCurrencyInfo(result.baseCurrency);
+  const quote = getCurrencyInfo(result.quoteCurrency);
 
   return (
     <div id="screen-2-rate-comparison" className="w-full max-w-xl mx-auto space-y-5">
@@ -132,9 +139,9 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
             <span className="text-xs font-medium text-slate-500 block mb-0.5 sm:mb-1">Today’s rate</span>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 font-display flex items-baseline gap-1.5 flex-wrap">
               <span>{formatRate(result.todayRate)}</span>
-              <span className="text-xs font-sans text-slate-500 font-normal">VND</span>
+              <span className="text-xs font-sans text-slate-500 font-normal">{quote.code}</span>
             </div>
-            <span className="text-[11px] text-slate-500 mt-0.5 sm:mt-1 block">per 1 SGD</span>
+            <span className="text-[11px] text-slate-500 mt-0.5 sm:mt-1 block">per 1 {base.code}</span>
           </div>
 
           {/* Benchmark Rate */}
@@ -142,9 +149,9 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
             <span className="text-xs font-medium text-slate-500 block mb-0.5 sm:mb-1">{result.benchmarkName}</span>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 font-display flex items-baseline gap-1.5 flex-wrap">
               <span>{formatRate(result.benchmarkRate)}</span>
-              <span className="text-xs font-sans text-slate-500 font-normal">VND</span>
+              <span className="text-xs font-sans text-slate-500 font-normal">{quote.code}</span>
             </div>
-            <span className="text-[11px] text-slate-500 mt-0.5 sm:mt-1 block">per 1 SGD</span>
+            <span className="text-[11px] text-slate-500 mt-0.5 sm:mt-1 block">per 1 {base.code}</span>
           </div>
         </div>
 
@@ -152,7 +159,7 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
         <div id="rate-difference-pill" className="p-3 rounded-xl bg-slate-100/80 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <span className="text-slate-600">Rate difference:</span>
           <span className="font-bold text-slate-900">
-            {formatRate(Math.abs(result.rateDifference))} VND {result.rateDifference > 0 ? 'lower' : 'higher'} per SGD
+            {formatRate(Math.abs(result.rateDifference))} {quote.code} {result.rateDifference > 0 ? 'lower' : 'higher'} per {base.code}
           </span>
         </div>
       </div>
@@ -200,7 +207,7 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
               </span>
             </div>
             <div className="text-xs font-semibold text-slate-600 bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200/70 inline-flex self-start sm:self-auto sm:text-right">
-              Approx. {result.differenceVNDFormatted}
+              Approx. {result.differenceFormatted}
             </div>
           </div>
 
@@ -208,13 +215,13 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-1">
             <div id="amount-today-total" className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
               <span className="text-xs text-slate-500 block mb-1">
-                {result.directionCode === 'VND_TO_SGD' ? "Today’s estimated cost" : "Today’s estimated payout"}
+                {result.directionCode === 'BUY_BASE' ? "Today’s estimated cost" : "Today’s estimated payout"}
               </span>
               <div className="text-lg font-bold text-slate-900 font-display">
-                {result.todayTotalVNDCompact}
+                {result.todayTotalCompact}
               </div>
               <span className="text-[11px] text-slate-500 block break-all">
-                {result.todayTotalVNDFormatted}
+                {result.todayTotalFormatted}
               </span>
             </div>
 
@@ -223,10 +230,10 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
                 At the {result.benchmarkName}
               </span>
               <div className="text-lg font-bold text-slate-900 font-display">
-                {result.benchmarkTotalVNDCompact}
+                {result.benchmarkTotalCompact}
               </div>
               <span className="text-[11px] text-slate-500 block break-all">
-                {result.benchmarkTotalVNDFormatted}
+                {result.benchmarkTotalFormatted}
               </span>
             </div>
           </div>
@@ -234,13 +241,13 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
           <p id="amount-plain-summary" className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-150">
             {isUnchanged
               ? `If you convert ${result.amountFormatted} today, the total cost or payout is virtually the same as exchanging at the ${result.benchmarkName}.`
-              : result.directionCode === 'VND_TO_SGD'
+              : result.directionCode === 'BUY_BASE'
                 ? (isMoreFavorable
-                    ? `If you convert to ${result.amountFormatted} today, you will spend approximately ${result.differenceVNDCompact} less than if you exchanged at the ${result.benchmarkName}.`
-                    : `If you convert to ${result.amountFormatted} today, you will spend approximately ${result.differenceVNDCompact} more than if you exchanged at the ${result.benchmarkName}.`)
+                    ? `If you convert to ${result.amountFormatted} today, you will spend approximately ${result.differenceCompact} less than if you exchanged at the ${result.benchmarkName}.`
+                    : `If you convert to ${result.amountFormatted} today, you will spend approximately ${result.differenceCompact} more than if you exchanged at the ${result.benchmarkName}.`)
                 : (isMoreFavorable
-                    ? `If you convert ${result.amountFormatted} today, you will receive approximately ${result.differenceVNDCompact} more than if you exchanged at the ${result.benchmarkName}.`
-                    : `If you convert ${result.amountFormatted} today, you will receive approximately ${result.differenceVNDCompact} less than if you exchanged at the ${result.benchmarkName}.`)}
+                    ? `If you convert ${result.amountFormatted} today, you will receive approximately ${result.differenceCompact} more than if you exchanged at the ${result.benchmarkName}.`
+                    : `If you convert ${result.amountFormatted} today, you will receive approximately ${result.differenceCompact} less than if you exchanged at the ${result.benchmarkName}.`)}
           </p>
         </div>
       ) : (
@@ -251,13 +258,13 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
             <h3 className="text-sm font-semibold">Want to see the actual money difference?</h3>
           </div>
           <p className="text-xs text-slate-500">
-            Enter the amount in SGD (e.g. S$3,000 for travel, tuition, or shopping) to see the exact Vietnamese Dong savings.
+            Enter the amount in {base.code} (e.g. {base.symbol}3,000 for travel, tuition, or shopping) to see the exact {quote.plural} savings.
           </p>
 
           <form onSubmit={handleApplyAmount} className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-semibold text-slate-400">
-                S$
+                {base.symbol}
               </span>
               <input
                 id="inline-amount-input"
@@ -283,22 +290,28 @@ export const Screen2Comparison: React.FC<Screen2Props> = ({
                 onClick={() => onUpdateAmount(3000)}
                 className="flex-1 sm:flex-initial px-3 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition-colors cursor-pointer active:scale-95"
               >
-                Try S$3,000
+                Try {base.symbol}3,000
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Secondary Information: Real Alpha Vantage Trend Visualizer */}
+      {/* Secondary Information: Real Historical Trend Visualizer */}
       <SecondaryTrendChart
         benchmark={input.benchmark}
         benchmarkRate={result.benchmarkRate}
         benchmarkLabel={result.benchmarkName}
         isMoreFavorable={isMoreFavorable}
         directionCode={result.directionCode}
+        baseCurrency={result.baseCurrency}
+        quoteCurrency={result.quoteCurrency}
+        haveCurrency={input.haveCurrency}
+        wantCurrency={input.wantCurrency}
         todayRate={result.todayRate}
         dailyPoints={dailyPoints}
+        historyDerivation={historyDerivation}
+        historyProvider={historyProvider}
         currentLastRefreshed={currentLastRefreshed}
         historyLastRefreshed={historyLastRefreshed}
       />

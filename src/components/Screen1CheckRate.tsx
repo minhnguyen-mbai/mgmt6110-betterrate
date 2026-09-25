@@ -1,7 +1,8 @@
 import React from 'react';
-import { ComparisonInput, BenchmarkType, FxDataStatus } from '../types';
-import { ArrowRightLeft, Calendar, HelpCircle, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { ComparisonInput, BenchmarkType, CurrencyCode, FxDataStatus } from '../types';
+import { ArrowRightLeft, Calendar, ChevronDown, HelpCircle, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatNumberWithCommas, formatRate } from '../utils/calculations';
+import { SUPPORTED_CURRENCIES, getCurrencyInfo, getQuotePair } from '../data/currencies';
 
 interface Screen1Props {
   input: ComparisonInput;
@@ -30,7 +31,13 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
   timeZone,
   onRetry,
 }) => {
-  const isVndToSgd = input.haveCurrency === 'VND' && input.wantCurrency === 'SGD';
+  const have = getCurrencyInfo(input.haveCurrency);
+  const want = getCurrencyInfo(input.wantCurrency);
+  const { base: baseCode, quote: quoteCode } = getQuotePair(input.haveCurrency, input.wantCurrency);
+  const base = getCurrencyInfo(baseCode);
+  const quote = getCurrencyInfo(quoteCode);
+  // Buying the base currency (e.g. VND -> SGD): a lower "1 base = X quote" rate is more favorable
+  const isBuyingBase = input.wantCurrency === baseCode;
   const isReady = status === 'success' && todayRate !== null && benchmark7d !== null && benchmark30d !== null;
 
   const handleToggleDirection = () => {
@@ -39,6 +46,19 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
       haveCurrency: prev.wantCurrency,
       wantCurrency: prev.haveCurrency,
     }));
+  };
+
+  // Choosing the currency already on the other side swaps the pair instead of creating an invalid one
+  const handleCurrencyChange = (side: 'have' | 'want', code: CurrencyCode) => {
+    onChangeInput((prev) => {
+      const current = side === 'have' ? prev.haveCurrency : prev.wantCurrency;
+      const other = side === 'have' ? prev.wantCurrency : prev.haveCurrency;
+      if (code === current) return prev;
+      if (code === other) {
+        return { ...prev, haveCurrency: prev.wantCurrency, wantCurrency: prev.haveCurrency };
+      }
+      return side === 'have' ? { ...prev, haveCurrency: code } : { ...prev, wantCurrency: code };
+    });
   };
 
   const handleBenchmarkChange = (benchmark: BenchmarkType) => {
@@ -81,7 +101,9 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
           className="mb-4 p-4 rounded-xl bg-slate-100/90 border border-slate-200 text-slate-700 flex items-center gap-3"
         >
           <RefreshCw className="w-4 h-4 text-slate-600 animate-spin shrink-0" />
-          <span className="text-xs sm:text-sm font-medium">Getting the latest exchange-rate data...</span>
+          <span className="text-xs sm:text-sm font-medium">
+            Getting the latest {input.haveCurrency} → {input.wantCurrency} exchange-rate data...
+          </span>
         </div>
       )}
 
@@ -97,8 +119,10 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
                 {status === 'empty_data' && 'We could not find enough exchange-rate data for this comparison.'}
                 {status === 'provider_unreachable' && 'We cannot reach the exchange-rate service right now. Please try again later.'}
                 {status === 'provider_error' && (errorMessage || 'The exchange-rate provider could not complete this request.')}
+                {status === 'provider_rate_limit' && 'The exchange-rate provider has reached its request limit for now. Please try again later.'}
+                {status === 'invalid_pair' && (errorMessage || 'This currency pair is not supported. Please choose two different currencies from the list.')}
               </p>
-              {errorMessage && status !== 'provider_error' && (
+              {errorMessage && status !== 'provider_error' && status !== 'invalid_pair' && status !== 'provider_rate_limit' && (
                 <p className="text-[11px] text-amber-800/90 mt-0.5">{errorMessage}</p>
               )}
             </div>
@@ -123,7 +147,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block">
               1. What currencies are you exchanging?
             </label>
-            <span className="text-[11px] sm:text-xs text-slate-400">Supported pair: VND ↔ SGD</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">Selected pair: {input.haveCurrency} ↔ {input.wantCurrency}</span>
           </div>
 
           {/* Currency Boxes: Stacked cleanly on mobile, side-by-side on desktop */}
@@ -131,22 +155,37 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             {/* I have */}
             <div
               id="i-have-box"
-              onClick={handleToggleDirection}
-              className="sm:col-span-5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 cursor-pointer transition-colors active:scale-[0.99]"
-              title="Tap to switch currency direction"
+              className="relative sm:col-span-5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-slate-900"
             >
               <div className="flex items-center justify-between mb-0.5">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">I have</span>
-                <span className="text-[10px] text-slate-400 sm:hidden">Tap to switch</span>
+                <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                  <span className="sm:hidden">Tap to change</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-xl sm:text-2xl font-bold text-slate-900 font-display">
-                  {input.haveCurrency}
+                  {have.code}
                 </span>
                 <span className="text-xs text-slate-600 font-medium">
-                  {input.haveCurrency === 'VND' ? 'Vietnamese Dong' : 'Singapore Dollar'}
+                  {have.name}
                 </span>
               </div>
+              {/* Native select covers the card: keeps the card design while staying keyboard and screen-reader accessible */}
+              <select
+                id="i-have-select"
+                aria-label="I have"
+                value={have.code}
+                onChange={(e) => handleCurrencyChange('have', e.target.value as CurrencyCode)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} — {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Swap Button */}
@@ -166,22 +205,37 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             {/* I want */}
             <div
               id="i-want-box"
-              onClick={handleToggleDirection}
-              className="sm:col-span-5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 cursor-pointer transition-colors active:scale-[0.99]"
-              title="Tap to switch currency direction"
+              className="relative sm:col-span-5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-slate-900"
             >
               <div className="flex items-center justify-between mb-0.5">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">I want</span>
-                <span className="text-[10px] text-slate-400 sm:hidden">Tap to switch</span>
+                <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                  <span className="sm:hidden">Tap to change</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-xl sm:text-2xl font-bold text-slate-900 font-display">
-                  {input.wantCurrency}
+                  {want.code}
                 </span>
                 <span className="text-xs text-slate-600 font-medium">
-                  {input.wantCurrency === 'SGD' ? 'Singapore Dollar' : 'Vietnamese Dong'}
+                  {want.name}
                 </span>
               </div>
+              {/* Native select covers the card: keeps the card design while staying keyboard and screen-reader accessible */}
+              <select
+                id="i-want-select"
+                aria-label="I want"
+                value={want.code}
+                onChange={(e) => handleCurrencyChange('want', e.target.value as CurrencyCode)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} — {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -202,9 +256,9 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             </div>
             <span className="hidden sm:inline text-slate-300">•</span>
             <p className="text-slate-600 leading-normal">
-              {isVndToSgd
-                ? 'Paying Vietnamese Dong to receive Singapore Dollars'
-                : 'Exchanging Singapore Dollars to receive Vietnamese Dong'}
+              {isBuyingBase
+                ? `Paying ${have.plural} to receive ${want.plural}`
+                : `Exchanging ${have.plural} to receive ${want.plural}`}
             </p>
           </div>
         </div>
@@ -235,7 +289,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
                   <span className="font-semibold text-sm text-slate-900">7-day average</span>
                 </div>
                 <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded shrink-0">
-                  {benchmark7d !== null ? `${formatRate(benchmark7d)} ₫` : '...'}
+                  {benchmark7d !== null ? `${formatRate(benchmark7d)} ${quote.symbol}` : '...'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
@@ -259,7 +313,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
                   <span className="font-semibold text-sm text-slate-900">30-day average</span>
                 </div>
                 <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded shrink-0">
-                  {benchmark30d !== null ? `${formatRate(benchmark30d)} ₫` : '...'}
+                  {benchmark30d !== null ? `${formatRate(benchmark30d)} ${quote.symbol}` : '...'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
@@ -275,12 +329,12 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             <label htmlFor="amount-input" className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
               3. Amount <span className="text-slate-400 font-normal normal-case">(Optional)</span>
             </label>
-            <span className="text-[11px] text-slate-400">Singapore Dollars (SGD)</span>
+            <span className="text-[11px] text-slate-400">{base.plural} ({base.code})</span>
           </div>
 
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
-              S$
+              {base.symbol}
             </div>
             <input
               id="amount-input"
@@ -308,7 +362,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                S${formatNumberWithCommas(val)}
+                {base.symbol}{formatNumberWithCommas(val)}
               </button>
             ))}
             {input.amount !== null && (
@@ -323,9 +377,9 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             )}
           </div>
           <p className="text-[11px] text-slate-500 leading-normal">
-            {isVndToSgd
-              ? 'Enter how many Singapore Dollars you want to purchase to estimate the VND cost difference.'
-              : 'Enter how many Singapore Dollars you want to convert to estimate the VND payout difference.'}
+            {isBuyingBase
+              ? `Enter how many ${base.plural} you want to purchase to estimate the ${quote.code} cost difference.`
+              : `Enter how many ${base.plural} you want to convert to estimate the ${quote.code} payout difference.`}
           </p>
         </div>
 
@@ -350,7 +404,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             <span className="text-[11px] sm:text-xs text-slate-500">
               {todayRate !== null ? (
                 <>
-                  Today’s rate: 1 SGD = <strong>{formatRate(todayRate)} VND</strong>
+                  Today’s rate: 1 {base.code} = <strong>{formatRate(todayRate)} {quote.code}</strong>
                   {lastRefreshed && (
                     <span className="text-slate-400 block sm:inline sm:ml-1">
                       (Refreshed {lastRefreshed} {timeZone || 'UTC'})
@@ -358,7 +412,7 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
                   )}
                 </>
               ) : status === 'loading' ? (
-                'Loading live exchange rate...'
+                `Loading live ${input.haveCurrency} → ${input.wantCurrency} exchange rate...`
               ) : (
                 'Exchange-rate data unavailable'
               )}
@@ -377,8 +431,8 @@ export const Screen1CheckRate: React.FC<Screen1Props> = ({
             BetterRate calculates whether today’s exchange rate is mathematically more favorable for your specific direction:
           </p>
           <ul className="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
-            <li><strong>Converting VND to SGD</strong>: A lower rate is more favorable because each Singapore Dollar costs fewer Vietnamese Dong.</li>
-            <li><strong>Converting SGD to VND</strong>: A higher rate is more favorable because you receive more Vietnamese Dong for each Singapore Dollar.</li>
+            <li><strong>Converting {quote.code} to {base.code}</strong>: A lower rate is more favorable because each {base.name} costs fewer {quote.plural}.</li>
+            <li><strong>Converting {base.code} to {quote.code}</strong>: A higher rate is more favorable because you receive more {quote.plural} for each {base.name}.</li>
           </ul>
         </div>
       </div>

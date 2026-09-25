@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ComparisonInput, ComparisonResult, FxCurrentData, FxHistoryData, FxDataStatus } from './types';
 import { calculateComparison } from './utils/calculations';
 import { fetchCurrentFx, fetchHistoryFx, FxApiError } from './services/fxApi';
+import { getQuotePair } from './data/currencies';
 import { Header } from './components/Header';
 import { ScreenIndicator } from './components/ScreenIndicator';
 import { Screen1CheckRate } from './components/Screen1CheckRate';
@@ -27,25 +28,45 @@ export default function App() {
   const [currentFx, setCurrentFx] = useState<FxCurrentData | null>(null);
   const [historyFx, setHistoryFx] = useState<FxHistoryData | null>(null);
 
+  // Both directions of a pair share one market quote (e.g. 1 SGD = X VND), so swapping
+  // re-derives the comparison from the same data; choosing a new currency loads a new quote.
+  const { base: baseCurrency, quote: quoteCurrency } = getQuotePair(input.haveCurrency, input.wantCurrency);
+  const loadController = useRef<AbortController | null>(null);
+
   const loadFxData = useCallback(async () => {
+    // Cancel any in-flight load for a previously selected pair
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
+
+    // Never keep the previous pair's numbers on screen while the new pair loads
+    setCurrentFx(null);
+    setHistoryFx(null);
     setStatus('loading');
     setErrorMessage(null);
 
     try {
       // 1. Fetch current real-time rate first
-      const currentData = await fetchCurrentFx();
+      const currentData = await fetchCurrentFx(baseCurrency, quoteCurrency, controller.signal);
+      if (controller.signal.aborted) return;
       setCurrentFx(currentData);
 
       // 2. After current rate succeeds, fetch historical benchmarks
-      const historyData = await fetchHistoryFx();
+      const historyData = await fetchHistoryFx(baseCurrency, quoteCurrency, controller.signal);
+      if (controller.signal.aborted) return;
       setHistoryFx(historyData);
       setStatus('success');
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       if (err instanceof FxApiError) {
         if (err.code === 'EMPTY_DATA') {
           setStatus('empty_data');
         } else if (err.code === 'PROVIDER_UNREACHABLE') {
           setStatus('provider_unreachable');
+        } else if (err.code === 'PROVIDER_RATE_LIMIT') {
+          setStatus('provider_rate_limit');
+        } else if (err.code === 'INVALID_PAIR' || err.code === 'UNSUPPORTED_CURRENCY') {
+          setStatus('invalid_pair');
         } else {
           setStatus('provider_error');
         }
@@ -55,10 +76,11 @@ export default function App() {
         setErrorMessage('The exchange-rate provider could not complete this request.');
       }
     }
-  }, []);
+  }, [baseCurrency, quoteCurrency]);
 
   useEffect(() => {
     loadFxData();
+    return () => loadController.current?.abort();
   }, [loadFxData]);
 
   // Derive today's rate and benchmark averages
@@ -70,12 +92,19 @@ export default function App() {
     if (todayRate === null || benchmark7d === null || benchmark30d === null) {
       return null;
     }
+    // Only compare data that belongs to the currently selected pair
+    if (
+      currentFx?.from !== baseCurrency || currentFx?.to !== quoteCurrency ||
+      historyFx?.from !== baseCurrency || historyFx?.to !== quoteCurrency
+    ) {
+      return null;
+    }
 
     const activeBenchmarkRate = input.benchmark === '7d' ? benchmark7d : benchmark30d;
     const activeBenchmarkName = input.benchmark === '7d' ? '7-day average' : '30-day average';
 
     return calculateComparison(input, todayRate, activeBenchmarkRate, activeBenchmarkName);
-  }, [input, todayRate, benchmark7d, benchmark30d]);
+  }, [input, todayRate, benchmark7d, benchmark30d, currentFx, historyFx, baseCurrency, quoteCurrency]);
 
   const handleNavigateTo = (screen: 1 | 2 | 3) => {
     if (screen > 1 && !comparisonResult) {
@@ -154,6 +183,8 @@ export default function App() {
                   input={input}
                   result={comparisonResult}
                   dailyPoints={historyFx?.daily || []}
+                  historyDerivation={historyFx?.derivation}
+                  historyProvider={historyFx?.provider}
                   currentLastRefreshed={currentFx?.lastRefreshed || null}
                   historyLastRefreshed={historyFx?.lastRefreshed || null}
                   onBack={() => handleNavigateTo(1)}
@@ -190,7 +221,7 @@ export default function App() {
       {/* Subtle, Calm Footer */}
       <footer id="app-footer" className="w-full border-t border-slate-200/80 bg-white/70 py-4 px-4 text-center text-xs text-slate-400">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>BetterRate • Real-Time Alpha Vantage FX Exchange Rate Data</span>
+          <span>BetterRate • Exchange-rate data from Alpha Vantage and Frankfurter</span>
           <span>Designed for non-trader consumers</span>
         </div>
         <p id="privacy-notice" className="max-w-4xl mx-auto mt-3 leading-relaxed">

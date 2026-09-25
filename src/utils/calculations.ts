@@ -1,4 +1,5 @@
-import { ComparisonInput, ComparisonResult } from '../types';
+import { ComparisonInput, ComparisonResult, CurrencyCode } from '../types';
+import { getCurrencyInfo, getQuotePair } from '../data/currencies';
 
 /**
  * Formats integer or whole amounts with thousand separators.
@@ -10,36 +11,55 @@ export function formatNumberWithCommas(num: number | null | undefined): string {
 
 /**
  * Formats exchange rates to 2 decimal places (or integers if whole).
+ * Small rates (below 10, e.g. 1 EUR = 1.49 SGD) use 4 decimal places so that
+ * day-to-day differences remain visible.
  */
 export function formatRate(num: number | null | undefined): string {
   if (num === null || num === undefined || isNaN(num)) return '0';
+  const maxDigits = Math.abs(num) < 10 ? 4 : 2;
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: Number.isInteger(num) ? 0 : 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: maxDigits,
   }).format(num);
 }
 
 /**
- * Formats VND amounts into human-friendly compact strings (e.g. "59K VND", "1.25M VND").
+ * Formats a money amount using the currency's minor units (e.g. 0 for VND/JPY, 2 for SGD).
  */
-export function formatCompactVND(val: number | null | undefined): string {
-  if (val === null || val === undefined || isNaN(val) || val === 0) return '0 VND';
+export function formatAmount(num: number | null | undefined, currency: CurrencyCode): string {
+  if (num === null || num === undefined || isNaN(num)) return '0';
+  const { minorUnits } = getCurrencyInfo(currency);
+  if (minorUnits === 0) return formatNumberWithCommas(num);
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: minorUnits,
+    maximumFractionDigits: minorUnits,
+  }).format(num);
+}
+
+/**
+ * Formats amounts into human-friendly compact strings (e.g. "59K VND", "1.25M VND", "4.52K SGD").
+ */
+export function formatCompactAmount(val: number | null | undefined, currency: CurrencyCode): string {
+  if (val === null || val === undefined || isNaN(val) || val === 0) return `0 ${currency}`;
   const absVal = Math.abs(val);
   if (absVal >= 1_000_000) {
     const millions = absVal / 1_000_000;
     const formatted = Number(millions.toFixed(2));
-    return `${formatted}M VND`;
+    return `${formatted}M ${currency}`;
   }
   if (absVal >= 1_000) {
     const thousands = absVal / 1_000;
-    const formatted = Number(thousands.toFixed(0));
-    return `${formatted}K VND`;
+    const formatted = Number(thousands.toFixed(getCurrencyInfo(currency).minorUnits > 0 ? 2 : 0));
+    return `${formatted}K ${currency}`;
   }
-  return `${formatNumberWithCommas(absVal)} VND`;
+  return `${formatAmount(absVal, currency)} ${currency}`;
 }
 
 /**
  * Calculates deterministic rate comparison and monetary impact based on real FX rates.
+ *
+ * todayRate and benchmarkRate are quoted as "1 base = X quote" for the pair's
+ * market quote (see getQuotePair), e.g. 1 SGD = X VND for both VND -> SGD and SGD -> VND.
  */
 export function calculateComparison(
   input: ComparisonInput,
@@ -47,24 +67,29 @@ export function calculateComparison(
   benchmarkRate: number,
   benchmarkName: string
 ): ComparisonResult {
+  const { base: baseCurrency, quote: quoteCurrency } = getQuotePair(input.haveCurrency, input.wantCurrency);
+  const base = getCurrencyInfo(baseCurrency);
+  const quote = getCurrencyInfo(quoteCurrency);
+
   // Determine direction purely from currency inputs
-  const isVndToSgd = input.haveCurrency === 'VND' && input.wantCurrency === 'SGD';
-  const directionCode = isVndToSgd ? 'VND_TO_SGD' : 'SGD_TO_VND';
-  const directionLabel = isVndToSgd ? 'Converting VND to SGD' : 'Converting SGD to VND';
+  const isBuyingBase = input.wantCurrency === baseCurrency;
+  const directionCode = isBuyingBase ? 'BUY_BASE' : 'SELL_BASE';
+  const conversion = `converting ${input.haveCurrency} to ${input.wantCurrency}`;
+  const directionLabel = `Converting ${input.haveCurrency} to ${input.wantCurrency}`;
 
   // Benchmark difference calculation:
-  // For VND → SGD:
+  // Buying the base currency (e.g. VND → SGD, paying quote currency):
   // percentageDifference = (benchmarkRate - currentRate) / benchmarkRate * 100
-  // If currentRate < benchmarkRate: "more favorable" (lower rate means less VND spent per SGD)
+  // If currentRate < benchmarkRate: "more favorable" (lower rate means less quote currency spent per base unit)
   // If currentRate > benchmarkRate: "less favorable"
   //
-  // For SGD → VND:
+  // Selling the base currency (e.g. SGD → VND, receiving quote currency):
   // percentageDifference = (currentRate - benchmarkRate) / benchmarkRate * 100
-  // If currentRate > benchmarkRate: "more favorable" (higher rate means more VND received per SGD)
+  // If currentRate > benchmarkRate: "more favorable" (higher rate means more quote currency received per base unit)
   // If currentRate < benchmarkRate: "less favorable"
 
   const rawPercentDiff = benchmarkRate > 0
-    ? (isVndToSgd
+    ? (isBuyingBase
         ? ((benchmarkRate - todayRate) / benchmarkRate) * 100
         : ((todayRate - benchmarkRate) / benchmarkRate) * 100)
     : 0;
@@ -81,85 +106,86 @@ export function calculateComparison(
 
   const rateDifference = benchmarkRate - todayRate;
 
+  const todayQuote = `1 ${base.code} = ${formatRate(todayRate)} ${quote.code}`;
+  const benchmarkQuote = `${formatRate(benchmarkRate)} ${quote.code}`;
+
   // Wording: strictly direction-aware, objective, no forbidden promotional words ("good rate", "best time", etc.)
   let statusText = '';
   let headlineComparison = '';
   let explanation = '';
 
   if (isUnchanged) {
-    statusText = isVndToSgd
-      ? 'Approximately unchanged for converting VND to SGD'
-      : 'Approximately unchanged for converting SGD to VND';
+    statusText = `Approximately unchanged for ${conversion}`;
     headlineComparison = 'Approximately unchanged today';
-    explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is virtually identical to the ${benchmarkName} (${formatRate(benchmarkRate)} VND). There is almost no rate difference compared with recent rates.`;
-  } else if (isVndToSgd) {
+    explanation = `Today’s rate (${todayQuote}) is virtually identical to the ${benchmarkName} (${benchmarkQuote}). There is almost no rate difference compared with recent rates.`;
+  } else if (isBuyingBase) {
     if (isMoreFavorable) {
-      statusText = 'Better for converting VND to SGD';
+      statusText = `Better for ${conversion}`;
       headlineComparison = `${percentFormatted}% more favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is lower than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting VND to SGD, a lower rate means each Singapore Dollar costs you less Vietnamese Dong.`;
+      explanation = `Today’s rate (${todayQuote}) is lower than the ${benchmarkName} (${benchmarkQuote}). When ${conversion}, a lower rate means each ${base.name} costs you less ${quote.plural}.`;
     } else {
-      statusText = 'Less favorable for converting VND to SGD';
+      statusText = `Less favorable for ${conversion}`;
       headlineComparison = `${percentFormatted}% less favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is higher than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting VND to SGD, a higher rate means each Singapore Dollar costs you more Vietnamese Dong.`;
+      explanation = `Today’s rate (${todayQuote}) is higher than the ${benchmarkName} (${benchmarkQuote}). When ${conversion}, a higher rate means each ${base.name} costs you more ${quote.plural}.`;
     }
   } else {
-    // SGD → VND
+    // Selling the base currency
     if (isMoreFavorable) {
-      statusText = 'Better for converting SGD to VND';
+      statusText = `Better for ${conversion}`;
       headlineComparison = `${percentFormatted}% more favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is higher than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting SGD to VND, a higher rate means you receive more Vietnamese Dong for each Singapore Dollar.`;
+      explanation = `Today’s rate (${todayQuote}) is higher than the ${benchmarkName} (${benchmarkQuote}). When ${conversion}, a higher rate means you receive more ${quote.plural} for each ${base.name}.`;
     } else {
-      statusText = 'Less favorable for converting SGD to VND';
+      statusText = `Less favorable for ${conversion}`;
       headlineComparison = `${percentFormatted}% less favorable today`;
-      explanation = `Today’s rate (1 SGD = ${formatRate(todayRate)} VND) is lower than the ${benchmarkName} (${formatRate(benchmarkRate)} VND). When converting SGD to VND, a lower rate means you receive less Vietnamese Dong for each Singapore Dollar.`;
+      explanation = `Today’s rate (${todayQuote}) is lower than the ${benchmarkName} (${benchmarkQuote}). When ${conversion}, a lower rate means you receive less ${quote.plural} for each ${base.name}.`;
     }
   }
 
-  // Optional monetary calculations if amount in SGD is provided
+  // Optional monetary calculations if amount in the base currency is provided
   let amountFormatted: string | null = null;
-  let todayTotalVND: number | null = null;
-  let todayTotalVNDFormatted: string | null = null;
-  let todayTotalVNDCompact: string | null = null;
+  let todayTotal: number | null = null;
+  let todayTotalFormatted: string | null = null;
+  let todayTotalCompact: string | null = null;
 
-  let benchmarkTotalVND: number | null = null;
-  let benchmarkTotalVNDFormatted: string | null = null;
-  let benchmarkTotalVNDCompact: string | null = null;
+  let benchmarkTotal: number | null = null;
+  let benchmarkTotalFormatted: string | null = null;
+  let benchmarkTotalCompact: string | null = null;
 
-  let differenceVND: number | null = null;
-  let differenceVNDFormatted: string | null = null;
-  let differenceVNDCompact: string | null = null;
+  let difference: number | null = null;
+  let differenceFormatted: string | null = null;
+  let differenceCompact: string | null = null;
   let moneyDifferenceText: string | null = null;
 
   if (input.amount !== null && input.amount > 0) {
     const qty = input.amount;
-    amountFormatted = `S$${formatNumberWithCommas(qty)}`;
+    amountFormatted = `${base.symbol}${formatNumberWithCommas(qty)}`;
 
-    todayTotalVND = qty * todayRate;
-    todayTotalVNDFormatted = `${formatNumberWithCommas(todayTotalVND)} VND`;
-    todayTotalVNDCompact = formatCompactVND(todayTotalVND);
+    todayTotal = qty * todayRate;
+    todayTotalFormatted = `${formatAmount(todayTotal, quote.code)} ${quote.code}`;
+    todayTotalCompact = formatCompactAmount(todayTotal, quote.code);
 
-    benchmarkTotalVND = qty * benchmarkRate;
-    benchmarkTotalVNDFormatted = `${formatNumberWithCommas(benchmarkTotalVND)} VND`;
-    benchmarkTotalVNDCompact = formatCompactVND(benchmarkTotalVND);
+    benchmarkTotal = qty * benchmarkRate;
+    benchmarkTotalFormatted = `${formatAmount(benchmarkTotal, quote.code)} ${quote.code}`;
+    benchmarkTotalCompact = formatCompactAmount(benchmarkTotal, quote.code);
 
-    // moneyDifferenceVND = absolute value of (benchmarkRate - currentRate) * amountSGD
-    differenceVND = Math.abs(benchmarkRate - todayRate) * qty;
-    differenceVNDFormatted = `${formatNumberWithCommas(differenceVND)} VND`;
-    differenceVNDCompact = formatCompactVND(differenceVND);
+    // moneyDifference = absolute value of (benchmarkRate - currentRate) * amount (in quote currency)
+    difference = Math.abs(benchmarkRate - todayRate) * qty;
+    differenceFormatted = `${formatAmount(difference, quote.code)} ${quote.code}`;
+    differenceCompact = formatCompactAmount(difference, quote.code);
 
     if (isUnchanged) {
       moneyDifferenceText = 'Approximately no difference today';
-    } else if (isVndToSgd) {
+    } else if (isBuyingBase) {
       if (isMoreFavorable) {
-        moneyDifferenceText = `About ${differenceVNDCompact} less today`;
+        moneyDifferenceText = `About ${differenceCompact} less today`;
       } else {
-        moneyDifferenceText = `About ${differenceVNDCompact} more today`;
+        moneyDifferenceText = `About ${differenceCompact} more today`;
       }
     } else {
       if (isMoreFavorable) {
-        moneyDifferenceText = `About ${differenceVNDCompact} more received today`;
+        moneyDifferenceText = `About ${differenceCompact} more received today`;
       } else {
-        moneyDifferenceText = `About ${differenceVNDCompact} less received today`;
+        moneyDifferenceText = `About ${differenceCompact} less received today`;
       }
     }
   }
@@ -167,6 +193,8 @@ export function calculateComparison(
   return {
     directionLabel,
     directionCode,
+    baseCurrency,
+    quoteCurrency,
     benchmarkName,
     todayRate,
     benchmarkRate,
@@ -179,15 +207,15 @@ export function calculateComparison(
     explanation,
     amount: input.amount,
     amountFormatted,
-    todayTotalVND,
-    todayTotalVNDFormatted,
-    todayTotalVNDCompact,
-    benchmarkTotalVND,
-    benchmarkTotalVNDFormatted,
-    benchmarkTotalVNDCompact,
-    differenceVND,
-    differenceVNDFormatted,
-    differenceVNDCompact,
+    todayTotal,
+    todayTotalFormatted,
+    todayTotalCompact,
+    benchmarkTotal,
+    benchmarkTotalFormatted,
+    benchmarkTotalCompact,
+    difference,
+    differenceFormatted,
+    differenceCompact,
     moneyDifferenceText,
   };
 }
