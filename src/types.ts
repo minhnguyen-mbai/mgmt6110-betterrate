@@ -20,16 +20,18 @@ export interface ComparisonInput {
 
 export interface ComparisonResult {
   directionLabel: string; // e.g. "Converting VND to SGD" or "Converting SGD to VND"
-  // Rates are quoted as "1 base = X quote" (e.g. 1 SGD = X VND).
-  // BUY_BASE: paying quote to receive base (e.g. VND -> SGD), a lower rate is more favorable.
-  // SELL_BASE: paying base to receive quote (e.g. SGD -> VND), a higher rate is more favorable.
+  // Rates are quoted in the user's direction, "1 base = X quote" with base = have and
+  // quote = want (e.g. VND -> SGD: 1 VND = X SGD); a higher rate is more favorable.
+  // directionCode is relative to the fetched market quote (e.g. 1 SGD = X VND):
+  // BUY_BASE: receiving the market base (e.g. VND -> SGD), so the market rates were inverted.
+  // SELL_BASE: paying the market base (e.g. SGD -> VND), so the market rates are shown as-is.
   directionCode: 'BUY_BASE' | 'SELL_BASE';
-  baseCurrency: CurrencyCode;
-  quoteCurrency: CurrencyCode;
+  baseCurrency: CurrencyCode; // the currency you have
+  quoteCurrency: CurrencyCode; // the currency you want
   benchmarkName: string; // "7-day average" or "30-day average"
-  todayRate: number; // 19,620
-  benchmarkRate: number; // 19,850 or 19,700
-  rateDifference: number; // rate difference in quote currency
+  todayRate: number; // e.g. 1 VND = 0.00005097 SGD
+  benchmarkRate: number; // same direction as todayRate
+  rateDifference: number; // benchmarkRate - todayRate, in quote currency per base unit
   percentDifference: number; // e.g. 1.16
   isMoreFavorable: boolean;
   isUnchanged: boolean;

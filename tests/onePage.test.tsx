@@ -202,5 +202,5 @@ test('6/18. multi-currency and swapped direction render the right decision', () 
 
   const vnd = text(page(loadedState('VND', 'SGD', 20295.77, 20366.36, 20450.25)));
   assert.ok(vnd.includes('Better for converting VND to SGD'));
-  assert.ok(vnd.includes('Today’s rate 1 SGD = 20,295.77 VND'));
+  assert.ok(vnd.includes('Today’s rate 1 VND = 0.00004927 SGD'));
 });

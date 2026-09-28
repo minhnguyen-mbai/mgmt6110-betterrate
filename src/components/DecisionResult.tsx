@@ -29,6 +29,10 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
   const base = getCurrencyInfo(result.baseCurrency);
   const quote = getCurrencyInfo(result.quoteCurrency);
   const benchmarkDetail = history.benchmarks[benchmark];
+  // History is fetched as the market quote; show it in the same direction as the result
+  const dailyPoints = (history.daily || []).map((p) =>
+    result.directionCode === 'BUY_BASE' ? { date: p.date, close: 1 / p.close } : p
+  );
 
   // Signed difference of today's rate versus the benchmark, in quote currency per base unit
   const signedDifference = result.todayRate - result.benchmarkRate;
@@ -122,7 +126,7 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
             isMoreFavorable={isMoreFavorable}
             quoteCurrency={result.quoteCurrency}
             todayRate={result.todayRate}
-            dailyPoints={history.daily || []}
+            dailyPoints={dailyPoints}
             historyDerivation={history.derivation}
             historyProvider={history.provider}
             currentLastRefreshed={current.lastRefreshed}

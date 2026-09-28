@@ -12,7 +12,7 @@ test('quote pair is shared by both directions (1 SGD = X VND)', () => {
   assert.deepEqual(getQuotePair('VND', 'USD'), { base: 'USD', quote: 'VND' });
 });
 
-test('VND -> SGD keeps the original methodology and wording', () => {
+test('VND -> SGD is quoted as 1 VND = X SGD with the same decision', () => {
   const r = calculateComparison(
     { haveCurrency: 'VND', wantCurrency: 'SGD', benchmark: '7d' },
     19620,
@@ -21,11 +21,12 @@ test('VND -> SGD keeps the original methodology and wording', () => {
   );
   assert.equal(r.directionCode, 'BUY_BASE');
   assert.equal(r.isMoreFavorable, true);
-  assert.equal(r.percentDifference, 1.16);
+  // Percentage of the displayed VND -> SGD rates: 19850 / 19620 - 1
+  assert.equal(r.percentDifference, 1.17);
   assert.equal(r.statusText, 'Better for converting VND to SGD');
   assert.equal(
     r.explanation,
-    'Today’s rate (1 SGD = 19,620 VND) is lower than the 7-day average (19,850 VND). When converting VND to SGD, a lower rate means each Singapore Dollar costs you less Vietnamese Dong.'
+    'Today’s rate (1 VND = 0.00005097 SGD) is higher than the 7-day average (0.00005038 SGD). When converting VND to SGD, a higher rate means you receive more Singapore Dollars for each Vietnamese Dong.'
   );
 });
 
