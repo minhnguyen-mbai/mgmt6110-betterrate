@@ -125,7 +125,7 @@ test('errors are shown on the same page', () => {
   s = comparisonReducer(s, { type: 'REQUEST_FAILURE', requestId: s.requestId, code: 'PROVIDER_RATE_LIMIT', message: 'limit' });
   const html = page(s);
   assert.ok(html.includes('id="input-form-card"') && html.includes('id="fx-failure-state"'));
-  assert.ok(text(html).includes('reached its request limit'));
+  assert.ok(text(html).includes('Rate data is temporarily unavailable due to provider limits. Please try again later.'));
   assert.ok(!html.includes('id="decision-result"'));
 });
 

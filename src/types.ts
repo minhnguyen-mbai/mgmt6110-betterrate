@@ -92,4 +92,5 @@ export type FxDataStatus =
   | 'provider_error'
   | 'provider_unreachable'
   | 'provider_rate_limit'
-  | 'invalid_pair';
+  | 'invalid_pair'
+  | 'pair_unavailable';

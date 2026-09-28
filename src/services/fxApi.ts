@@ -5,6 +5,7 @@ export type FxErrorCode =
   | 'PROVIDER_UNREACHABLE'
   | 'PROVIDER_RATE_LIMIT'
   | 'PROVIDER_ERROR'
+  | 'PAIR_UNAVAILABLE'
   | 'EMPTY_DATA'
   | 'INVALID_RATE'
   | 'INVALID_PAIR'
@@ -16,6 +17,7 @@ const RECOGNIZED_CODES: ReadonlySet<string> = new Set<FxErrorCode>([
   'PROVIDER_UNREACHABLE',
   'PROVIDER_RATE_LIMIT',
   'PROVIDER_ERROR',
+  'PAIR_UNAVAILABLE',
   'EMPTY_DATA',
   'INVALID_RATE',
   'INVALID_PAIR',
@@ -25,9 +27,10 @@ const RECOGNIZED_CODES: ReadonlySet<string> = new Set<FxErrorCode>([
 
 const DEFAULT_ERROR_MESSAGES: Record<FxErrorCode, string> = {
   KEY_MISSING: 'Live exchange rates are not available right now because the server is not fully configured.',
-  PROVIDER_UNREACHABLE: 'We cannot reach the exchange-rate service right now. Please try again later.',
-  PROVIDER_RATE_LIMIT: 'The exchange-rate provider has reached its request limit for now. Please try again later.',
-  PROVIDER_ERROR: 'The exchange-rate provider could not complete this request.',
+  PROVIDER_UNREACHABLE: 'Rate data is temporarily unavailable. Please try again shortly.',
+  PROVIDER_RATE_LIMIT: 'Rate data is temporarily unavailable due to provider limits. Please try again later.',
+  PROVIDER_ERROR: 'Rate data is temporarily unavailable. Please try again shortly.',
+  PAIR_UNAVAILABLE: 'This currency pair is not currently supported. Please choose a different currency pair.',
   EMPTY_DATA: 'We could not find enough exchange-rate data for this comparison.',
   INVALID_RATE: 'The exchange-rate provider returned an invalid exchange-rate value.',
   INVALID_PAIR: 'This currency pair is not supported. Please choose two different currencies from the list.',

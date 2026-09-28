@@ -8,9 +8,10 @@
 
 export const ERROR_MESSAGES = Object.freeze({
   KEY_MISSING: 'Live exchange rates are not available right now because the server is not fully configured.',
-  PROVIDER_UNREACHABLE: 'We cannot reach the exchange-rate service right now. Please try again later.',
-  PROVIDER_RATE_LIMIT: 'The exchange-rate provider has reached its request limit for now. Please try again later.',
-  PROVIDER_ERROR: 'The exchange-rate provider could not complete this request.',
+  PROVIDER_UNREACHABLE: 'Rate data is temporarily unavailable. Please try again shortly.',
+  PROVIDER_RATE_LIMIT: 'Rate data is temporarily unavailable due to provider limits. Please try again later.',
+  PROVIDER_ERROR: 'Rate data is temporarily unavailable. Please try again shortly.',
+  PAIR_UNAVAILABLE: 'This currency pair is not currently supported. Please choose a different currency pair.',
   EMPTY_DATA: 'We could not find enough exchange-rate data for this comparison.',
   INVALID_RATE: 'The exchange-rate provider returned an invalid exchange-rate value.',
   UNSUPPORTED_CURRENCY: 'This currency is not supported yet. Please choose a currency from the list.',

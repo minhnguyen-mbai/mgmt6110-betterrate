@@ -54,7 +54,7 @@ export default function App() {
           type: 'REQUEST_FAILURE',
           requestId,
           code: null,
-          message: 'The exchange-rate provider could not complete this request.',
+          message: 'Rate data is temporarily unavailable. Please try again shortly.',
         });
       }
     }

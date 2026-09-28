@@ -70,6 +70,8 @@ export function statusFromErrorCode(code: FxErrorCode | null): FxDataStatus {
     case 'INVALID_PAIR':
     case 'UNSUPPORTED_CURRENCY':
       return 'invalid_pair';
+    case 'PAIR_UNAVAILABLE':
+      return 'pair_unavailable';
     default:
       return 'provider_error';
   }

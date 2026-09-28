@@ -245,24 +245,28 @@ export const RateInputSection: React.FC<RateInputSectionProps> = ({
             <div>
               <p className="text-xs sm:text-sm font-semibold">
                 {status === 'empty_data' && 'We could not find enough exchange-rate data for this comparison.'}
-                {status === 'provider_unreachable' && 'We cannot reach the exchange-rate service right now. Please try again later.'}
-                {status === 'provider_error' && (errorMessage || 'The exchange-rate provider could not complete this request.')}
-                {status === 'provider_rate_limit' && 'The exchange-rate provider has reached its request limit for now. Please try again later.'}
+                {status === 'provider_unreachable' && 'Rate data is temporarily unavailable. Please try again shortly.'}
+                {status === 'provider_error' && (errorMessage || 'Rate data is temporarily unavailable. Please try again shortly.')}
+                {status === 'provider_rate_limit' && 'Rate data is temporarily unavailable due to provider limits. Please try again later.'}
                 {status === 'invalid_pair' && (errorMessage || 'This currency pair is not supported. Please choose two different currencies from the list.')}
+                {status === 'pair_unavailable' && (errorMessage || 'This currency pair is not currently supported. Please choose a different currency pair.')}
               </p>
-              {errorMessage && status !== 'provider_error' && status !== 'invalid_pair' && status !== 'provider_rate_limit' && (
+              {errorMessage && status !== 'provider_error' && status !== 'invalid_pair' && status !== 'pair_unavailable' && status !== 'provider_rate_limit' && (
                 <p className="text-[11px] text-amber-800/90 mt-0.5">{errorMessage}</p>
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onCheck}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-amber-900 text-white hover:bg-amber-800 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-2xs"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Retry</span>
-          </button>
+          {/* Retrying cannot help a pair the provider does not serve; the message asks for another pair */}
+          {status !== 'pair_unavailable' && (
+            <button
+              type="button"
+              onClick={onCheck}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-amber-900 text-white hover:bg-amber-800 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-2xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry</span>
+            </button>
+          )}
         </div>
       )}
 
