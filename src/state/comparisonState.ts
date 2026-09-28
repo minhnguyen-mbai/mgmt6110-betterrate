@@ -9,6 +9,7 @@ import {
 import { getQuotePair } from '../data/currencies';
 import { calculateComparison } from '../utils/calculations';
 import { FxErrorCode } from '../services/fxApi';
+import { ComparisonSelection } from './urlState';
 
 /**
  * One-page state: the selection and the data loaded for one market quote
@@ -33,6 +34,8 @@ export interface ComparisonState {
   errorMessage: string | null;
   data: LoadedFxData | null;
   requestId: number;
+  /** Load the selection without a button press: it came from a comparison URL (shared link, Back/Forward) */
+  autoLoad: boolean;
 }
 
 export type ComparisonAction =
@@ -42,7 +45,8 @@ export type ComparisonAction =
   | { type: 'REQUEST_START' }
   | { type: 'REQUEST_SUCCESS'; requestId: number; pairKey: string; current: FxCurrentData; history: FxHistoryData }
   | { type: 'REQUEST_FAILURE'; requestId: number; code: FxErrorCode | null; message: string }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'RESTORE'; selection: ComparisonSelection | null };
 
 export const initialComparisonState: ComparisonState = {
   haveCurrency: 'VND',
@@ -52,7 +56,13 @@ export const initialComparisonState: ComparisonState = {
   errorMessage: null,
   data: null,
   requestId: 0,
+  autoLoad: false,
 };
+
+/** Initial state for a page opened on a comparison URL (loads it), or the blank form. */
+export function createInitialState(selection: ComparisonSelection | null): ComparisonState {
+  return selection ? { ...initialComparisonState, ...selection, autoLoad: true } : initialComparisonState;
+}
 
 export function getPairKey(have: CurrencyCode, want: CurrencyCode): string {
   const { base, quote } = getQuotePair(have, want);
@@ -104,7 +114,7 @@ export function comparisonReducer(state: ComparisonState, action: ComparisonActi
     case 'SET_BENCHMARK':
       return { ...state, benchmark: action.benchmark };
     case 'REQUEST_START':
-      return { ...state, status: 'loading', errorMessage: null, data: null, requestId: state.requestId + 1 };
+      return { ...state, status: 'loading', errorMessage: null, data: null, requestId: state.requestId + 1, autoLoad: false };
     case 'REQUEST_SUCCESS':
       if (action.requestId !== state.requestId) return state;
       if (action.pairKey !== getPairKey(state.haveCurrency, state.wantCurrency)) return state;
@@ -119,6 +129,13 @@ export function comparisonReducer(state: ComparisonState, action: ComparisonActi
       return { ...state, status: statusFromErrorCode(action.code), errorMessage: action.message, data: null };
     case 'RESET':
       return { ...state, status: 'idle', errorMessage: null, data: null, requestId: state.requestId + 1 };
+    case 'RESTORE': {
+      // Back/Forward to the blank page: the initial form, with any in-flight request ignored
+      if (!action.selection) return { ...initialComparisonState, requestId: state.requestId + 1 };
+      // A comparison entry: the same market quote keeps its data (instant); otherwise it is loaded
+      const next = withSelection(state, action.selection.haveCurrency, action.selection.wantCurrency);
+      return { ...next, benchmark: action.selection.benchmark, autoLoad: next.data === null };
+    }
     default:
       return state;
   }
