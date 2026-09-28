@@ -65,9 +65,13 @@ function card(state: ComparisonState) {
       onCheckAnother={noop}
     />
   );
-  const row = (id: string) => text(html.match(new RegExp(`<div id="${id}"[^>]*>(.*?)</div>`))?.[1] ?? '').trim();
+  // The freshness cue (Bug #3) sits inside the today row; rate rows are compared without it
+  const freshness = /<dd id="today-rate-freshness"[^>]*>(.*?)<\/dd>/;
+  const rows = html.replace(freshness, '');
+  const row = (id: string) => text(rows.match(new RegExp(`<div id="${id}"[^>]*>(.*?)</div>`))?.[1] ?? '').trim();
   return {
     html,
+    freshness: text(html.match(freshness)?.[1] ?? '').trim(),
     today: row('today-rate-row'),
     benchmark: row('benchmark-rate-row'),
     difference: row('rate-difference-row'),

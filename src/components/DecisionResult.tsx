@@ -4,6 +4,7 @@ import { SecondaryTrendChart } from './SecondaryTrendChart';
 import { CheckCircle2, AlertCircle, HelpCircle, RotateCcw, ChevronDown } from 'lucide-react';
 import { formatRate } from '../utils/calculations';
 import { getCurrencyInfo } from '../data/currencies';
+import { formatRateFreshness } from '../utils/freshness';
 
 interface DecisionResultProps {
   benchmark: BenchmarkType;
@@ -29,6 +30,7 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
   const base = getCurrencyInfo(result.baseCurrency);
   const quote = getCurrencyInfo(result.quoteCurrency);
   const benchmarkDetail = history.benchmarks[benchmark];
+  const freshness = formatRateFreshness(current.lastRefreshed, current.timeZone);
   // History is fetched as the market quote; show it in the same direction as the result
   const dailyPoints = (history.daily || []).map((p) =>
     result.directionCode === 'BUY_BASE' ? { date: p.date, close: 1 / p.close } : p
@@ -99,6 +101,7 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
           <div id="today-rate-row" className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <dt className="text-slate-600">Today’s rate</dt>
             <dd className="font-bold text-slate-900">1 {base.code} = {formatRate(result.todayRate)} {quote.code}</dd>
+            <dd id="today-rate-freshness" className="basis-full text-right text-xs text-slate-500">{freshness}</dd>
           </div>
           <div id="benchmark-rate-row" className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <dt className="text-slate-600">{result.benchmarkName}</dt>
