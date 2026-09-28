@@ -254,7 +254,7 @@ test('Case F: a swap is a history entry; Back/Forward restore the direction', ()
   page.compare();
   page.dispatch({ type: 'SWAP' });
   assert.equal(page.url, '?have=SGD&want=VND&benchmark=7d');
-  assert.match(page.view().t, /Today’s rate 1 SGD = 19,620 VND/);
+  assert.match(page.view().t, /Today’s rate 1 SGD = 19,620\.00 VND/);
 
   browser.back();
   assert.deepEqual([page.state.haveCurrency, page.state.wantCurrency], ['VND', 'SGD']);

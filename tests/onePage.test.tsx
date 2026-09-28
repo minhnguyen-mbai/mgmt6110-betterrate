@@ -195,7 +195,7 @@ test('11/12/13. trend and calculation details are collapsed disclosures, in orde
 test('6/18. multi-currency and swapped direction render the right decision', () => {
   const eurSgd = text(page(loadedState('EUR', 'SGD', 1.458, 1.4634, 1.4716)));
   assert.ok(eurSgd.includes('Converting EUR to SGD') && eurSgd.includes('below the 7-day average'));
-  assert.ok(eurSgd.includes('Today’s rate 1 EUR = 1.458 SGD'));
+  assert.ok(eurSgd.includes('Today’s rate 1 EUR = 1.4580 SGD'));
 
   const sgdEur = text(page(loadedState('SGD', 'EUR', 1.458, 1.4634, 1.4716)));
   assert.ok(sgdEur.includes('Converting SGD to EUR') && sgdEur.includes('above the 7-day average'));

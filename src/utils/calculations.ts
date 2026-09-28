@@ -21,6 +21,48 @@ export function formatRate(num: number | null | undefined): string {
 }
 
 /**
+ * Display precision for one displayed pair, so today's rate, the benchmark and the difference line up:
+ * a fixed number of decimals chosen from the pair's benchmark rate (not from each value), with
+ * trailing zeros kept:
+ * - 100 and above: 2 decimals (1 SGD = 19,620.00 VND)
+ * - 1 to 100: 4 decimals (1 GBP = 5.6590 MYR)
+ * - below 1: 4 significant digits (1 MYR = 0.1767 GBP, 1 VND = 0.00005038 SGD), so small
+ *   reciprocal rates never round to zero
+ */
+export function pairDecimals(reference: number): number {
+  const ref = Math.abs(reference);
+  if (!Number.isFinite(ref) || ref === 0) return 4;
+  if (ref >= 100) return 2;
+  if (ref >= 1) return 4;
+  return Math.min(12, 3 - Math.floor(Math.log10(ref)));
+}
+
+function formatFixed(num: number, decimals: number): string {
+  return new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
+}
+
+/** A rate of the pair whose benchmark is `reference`, at the pair's precision. */
+export function formatPairRate(value: number, reference: number): string {
+  if (!Number.isFinite(value)) return '0';
+  return formatFixed(value, pairDecimals(reference));
+}
+
+/**
+ * The size of a difference between two rates of that pair (the caller adds the sign): the pair's
+ * precision, or more if needed to show at least 2 significant digits, so a small difference is
+ * never rounded to zero or to a single digit.
+ */
+export function formatRateDifference(difference: number, reference: number): string {
+  const size = Math.abs(difference);
+  if (!Number.isFinite(size)) return '0';
+  let decimals = pairDecimals(reference);
+  if (size > 0) {
+    decimals = Math.min(12, Math.max(decimals, 1 - Math.floor(Math.log10(size))));
+  }
+  return formatFixed(size, decimals);
+}
+
+/**
  * Calculates deterministic rate comparison based on real FX rates.
  *
  * marketTodayRate and marketBenchmarkRate are the fetched market quote "1 base = X quote"
@@ -69,8 +111,8 @@ export function calculateComparison(
 
   const rateDifference = benchmarkRate - todayRate;
 
-  const todayQuote = `1 ${base.code} = ${formatRate(todayRate)} ${quote.code}`;
-  const benchmarkQuote = `${formatRate(benchmarkRate)} ${quote.code}`;
+  const todayQuote = `1 ${base.code} = ${formatPairRate(todayRate, benchmarkRate)} ${quote.code}`;
+  const benchmarkQuote = `${formatPairRate(benchmarkRate, benchmarkRate)} ${quote.code}`;
 
   // Wording: descriptive only. The comparison says where today's rate sits relative to the selected
   // average; it does not judge whether converting now is better or worse for the user.

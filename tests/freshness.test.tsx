@@ -143,13 +143,13 @@ test('Case D: a valid rate without a usable timestamp still renders, with a trut
     assert.ok(selectComparison(state), 'still a result, not an error');
     const { row, freshness, cardText } = todayRow(state);
     assert.equal(freshness, 'Update time unavailable');
-    assert.ok(row.startsWith('Today’s rate 1 VND = 0.00005 SGD'));
+    assert.ok(row.startsWith('Today’s rate 1 VND = 0.00005000 SGD'));
     assert.ok(!cardText.includes('Invalid Date'));
   }
 });
 
 test('Case E: VND -> SGD keeps the Bug #1 quote direction next to the freshness cue', () => {
   const { row } = todayRow(loaded('VND', 'SGD', { lastRefreshed: '2026-09-28 09:36:45', timeZone: 'UTC' }));
-  assert.match(row, /^Today’s rate 1 VND = 0\.00005 SGD Rate as of /);
+  assert.match(row, /^Today’s rate 1 VND = 0\.00005000 SGD Rate as of /);
   assert.ok(!row.includes('1 SGD ='));
 });

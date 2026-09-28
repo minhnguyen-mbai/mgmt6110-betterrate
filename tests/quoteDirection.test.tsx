@@ -94,7 +94,7 @@ test('Case A: VND -> SGD is quoted as 1 VND = X SGD (current above benchmark)', 
   const c = card(s);
   assert.equal(c.today, 'Today’s rate 1 VND = 0.00005097 SGD');
   assert.equal(c.benchmark, '7-day average 1 VND = 0.00005038 SGD');
-  assert.equal(c.difference, 'Difference +0.0000005906 SGD per VND');
+  assert.equal(c.difference, 'Difference +0.00000059 SGD per VND');
   assert.ok(!c.html.includes('1 SGD ='), 'no SGD -> VND quote anywhere');
   assert.ok(!c.html.includes('VND per SGD'));
   // The trend chart uses the same direction and unit
@@ -105,9 +105,9 @@ test('Case A: VND -> SGD is quoted as 1 VND = X SGD (current above benchmark)', 
 
 test('Case A: VND -> SGD with current below benchmark gives a negative difference', () => {
   const c = card(loaded('VND', 'SGD', 20450, 20366.36));
-  assert.equal(c.today, 'Today’s rate 1 VND = 0.0000489 SGD');
-  assert.equal(c.benchmark, '7-day average 1 VND = 0.0000491 SGD');
-  assert.equal(c.difference, 'Difference −0.0000002008 SGD per VND');
+  assert.equal(c.today, 'Today’s rate 1 VND = 0.00004890 SGD');
+  assert.equal(c.benchmark, '7-day average 1 VND = 0.00004910 SGD');
+  assert.equal(c.difference, 'Difference −0.00000020 SGD per VND');
   assert.ok(text(c.html).includes('below the 7-day average'));
 });
 
@@ -120,9 +120,9 @@ test('Case B: SGD -> VND is quoted as 1 SGD = X VND', () => {
   assert.equal(r.benchmarkRate, 19850);
 
   const c = card(s);
-  assert.equal(c.today, 'Today’s rate 1 SGD = 19,620 VND');
-  assert.equal(c.benchmark, '7-day average 1 SGD = 19,850 VND');
-  assert.equal(c.difference, 'Difference −230 VND per SGD');
+  assert.equal(c.today, 'Today’s rate 1 SGD = 19,620.00 VND');
+  assert.equal(c.benchmark, '7-day average 1 SGD = 19,850.00 VND');
+  assert.equal(c.difference, 'Difference −230.00 VND per SGD');
   assert.ok(!c.html.includes('1 VND ='));
   assert.ok(text(c.html).includes('below the 7-day average'));
 });
@@ -131,12 +131,12 @@ test('Case C: GBP -> MYR and MYR -> GBP follow the same 1 FROM = X TO rule', () 
   // Market quote: 1 GBP = X MYR
   const gbpMyr = card(loaded('GBP', 'MYR', 5.6812, 5.659));
   assert.equal(gbpMyr.today, 'Today’s rate 1 GBP = 5.6812 MYR');
-  assert.equal(gbpMyr.benchmark, '7-day average 1 GBP = 5.659 MYR');
+  assert.equal(gbpMyr.benchmark, '7-day average 1 GBP = 5.6590 MYR');
   assert.equal(gbpMyr.difference, 'Difference +0.0222 MYR per GBP');
 
   const myrGbp = card(loaded('MYR', 'GBP', 5.6812, 5.659));
-  assert.equal(myrGbp.today, `Today’s rate 1 MYR = ${formatRate(1 / 5.6812)} GBP`);
-  assert.equal(myrGbp.benchmark, `7-day average 1 MYR = ${formatRate(1 / 5.659)} GBP`);
+  assert.equal(myrGbp.today, 'Today’s rate 1 MYR = 0.1760 GBP');
+  assert.equal(myrGbp.benchmark, '7-day average 1 MYR = 0.1767 GBP');
   assert.match(myrGbp.difference, /^Difference −[\d.]+ GBP per MYR$/);
 });
 

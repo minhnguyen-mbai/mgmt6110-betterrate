@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BenchmarkType, CurrencyCode } from '../types';
-import { formatRate } from '../utils/calculations';
+import { formatPairRate, formatRateDifference } from '../utils/calculations';
 import { getCurrencyInfo } from '../data/currencies';
 
 interface SecondaryTrendChartProps {
@@ -45,6 +45,8 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
   currentLastRefreshed,
 }) => {
   const quote = getCurrencyInfo(quoteCurrency);
+  // Same precision as the result card: one rule for every rate of this pair
+  const formatRate = (value: number) => formatPairRate(value, benchmarkRate);
   const Q = quote.code;
   const isDerived = historyDerivation === 'inverse' || historyDerivation === 'cross';
   const isFrankfurter = historyProvider === 'Frankfurter';
@@ -320,8 +322,8 @@ export const SecondaryTrendChart: React.FC<SecondaryTrendChartProps> = ({
             </span>
             <span className="text-[11px] text-slate-500">
               {activePoint.rate < benchmarkRate
-                ? `${formatRate(benchmarkRate - activePoint.rate)} ${Q} lower than ${benchmarkLabel}`
-                : `${formatRate(activePoint.rate - benchmarkRate)} ${Q} higher than ${benchmarkLabel}`}
+                ? `${formatRateDifference(benchmarkRate - activePoint.rate, benchmarkRate)} ${Q} lower than ${benchmarkLabel}`
+                : `${formatRateDifference(activePoint.rate - benchmarkRate, benchmarkRate)} ${Q} higher than ${benchmarkLabel}`}
             </span>
           </>
         ) : (

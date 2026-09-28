@@ -2,7 +2,7 @@ import React from 'react';
 import { BenchmarkType, ComparisonResult, FxCurrentData, FxHistoryData } from '../types';
 import { SecondaryTrendChart } from './SecondaryTrendChart';
 import { ArrowUp, ArrowDown, Minus, RotateCcw, ChevronDown } from 'lucide-react';
-import { formatRate } from '../utils/calculations';
+import { formatPairRate, formatRateDifference } from '../utils/calculations';
 import { getCurrencyInfo } from '../data/currencies';
 import { formatRateFreshness } from '../utils/freshness';
 import { formatBenchmarkWindow } from '../utils/benchmarkWindow';
@@ -40,7 +40,9 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
 
   // Signed difference of today's rate versus the benchmark, in quote currency per base unit
   const signedDifference = result.todayRate - result.benchmarkRate;
-  const differenceText = `${signedDifference > 0 ? '+' : signedDifference < 0 ? '−' : ''}${formatRate(Math.abs(signedDifference))} ${quote.code} per ${base.code}`;
+  const differenceText = `${signedDifference > 0 ? '+' : signedDifference < 0 ? '−' : ''}${formatRateDifference(signedDifference, result.benchmarkRate)} ${quote.code} per ${base.code}`;
+  // One precision for every rate of this pair (see pairDecimals)
+  const rate = (value: number) => formatPairRate(value, result.benchmarkRate);
 
   return (
     <section id="decision-result" aria-live="polite" className="w-full max-w-xl mx-auto mt-5 space-y-5">
@@ -106,12 +108,12 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
         <dl id="rate-comparison-rows" className="mt-4 divide-y divide-slate-900/10 text-sm">
           <div id="today-rate-row" className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <dt className="text-slate-600">Today’s rate</dt>
-            <dd className="font-bold text-slate-900">1 {base.code} = {formatRate(result.todayRate)} {quote.code}</dd>
+            <dd className="font-bold text-slate-900">1 {base.code} = {rate(result.todayRate)} {quote.code}</dd>
             <dd id="today-rate-freshness" className="basis-full text-right text-xs text-slate-500">{freshness}</dd>
           </div>
           <div id="benchmark-rate-row" className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <dt className="text-slate-600">{result.benchmarkName}</dt>
-            <dd className="font-semibold text-slate-900">1 {base.code} = {formatRate(result.benchmarkRate)} {quote.code}</dd>
+            <dd className="font-semibold text-slate-900">1 {base.code} = {rate(result.benchmarkRate)} {quote.code}</dd>
             <dd id="benchmark-window" className="basis-full text-right text-xs text-slate-500">{benchmarkWindow}</dd>
           </div>
           <div id="rate-difference-row" className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -156,16 +158,16 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
           <dl className="divide-y divide-slate-100">
             <div className="py-2 flex flex-wrap justify-between gap-x-3">
               <dt>Today’s rate</dt>
-              <dd className="font-semibold text-slate-900">1 {base.code} = {formatRate(result.todayRate)} {quote.code}</dd>
+              <dd className="font-semibold text-slate-900">1 {base.code} = {rate(result.todayRate)} {quote.code}</dd>
             </div>
             <div className="py-2 flex flex-wrap justify-between gap-x-3">
               <dt>{result.benchmarkName}</dt>
-              <dd className="font-semibold text-slate-900">1 {base.code} = {formatRate(result.benchmarkRate)} {quote.code}</dd>
+              <dd className="font-semibold text-slate-900">1 {base.code} = {rate(result.benchmarkRate)} {quote.code}</dd>
             </div>
             <div className="py-2 flex flex-wrap justify-between gap-x-3">
               <dt>Absolute difference</dt>
               <dd className="font-semibold text-slate-900">
-                {formatRate(Math.abs(result.rateDifference))} {quote.code} {result.rateDifference > 0 ? 'lower' : 'higher'} per {base.code}
+                {formatRateDifference(result.rateDifference, result.benchmarkRate)} {quote.code} {result.rateDifference > 0 ? 'lower' : 'higher'} per {base.code}
               </dd>
             </div>
             <div className="py-2 flex flex-wrap justify-between gap-x-3">

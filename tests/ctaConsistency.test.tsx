@@ -123,7 +123,7 @@ test('Case D: a swap updates the shown result to the reversed direction from the
   const s = render(swapped);
   assert.ok(s.hasResult && s.hasNote && !s.hasCta);
   assert.ok(s.card.startsWith('Converting SGD to VND'));
-  assert.ok(s.card.includes('Today’s rate 1 SGD = 19,620 VND'));
+  assert.ok(s.card.includes('Today’s rate 1 SGD = 19,620.00 VND'));
   assert.ok(!s.card.includes('1 VND ='), 'no leftover VND -> SGD quote');
 });
 
