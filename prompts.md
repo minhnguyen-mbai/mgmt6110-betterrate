@@ -2425,3 +2425,293 @@ iteration
 ```
 
 The main lesson was that the boundary between “implementation” and “judgment” can move without being obvious, so the human needs to inspect not only whether the product works, but what the generated system is implicitly claiming.
+
+
+
+
+
+
+# PS4 Blind Arbiter Exchanges
+
+These blind-arbiter exchanges were conducted after peer findings had been collected and reproduced. The arbiters were not told who built the product or which evaluator assigned each original severity.
+
+---
+
+## Blind Arbiter 1 — Missing timestamp / freshness
+
+### Prompt
+
+You are acting as a blind Nielsen heuristic evaluation arbiter.
+
+Evaluate ONLY the evidence below. You do not know who built the product or who gave the original ratings.
+
+Product job:
+Help a user compare today's exchange rate with a recent benchmark before deciding whether now is a relatively more or less favorable time to exchange currencies.
+
+Observed behavior:
+- The primary result card displays "Today's rate".
+- No clock time is shown beside the current rate.
+- A date/freshness indication is available only deeper in the interface.
+- The backend response already contains timestamp/freshness information.
+- The user may use the result to decide whether to exchange currency now.
+
+Relevant heuristic:
+#1 Visibility of System Status.
+
+Severity scale:
+0 = not a usability problem
+1 = cosmetic
+2 = minor usability problem
+3 = major usability problem
+4 = usability catastrophe
+
+Consider:
+- frequency
+- impact
+- persistence / ability to learn around it
+- trust or market impact
+
+Answer in this exact format:
+
+Recommended severity: [0-4]
+
+Reasoning:
+[brief evidence-based explanation]
+
+Screen or system:
+[SCREEN or SYSTEM, with reason]
+
+What would make the severity one level higher:
+[answer]
+
+What would make the severity one level lower:
+[answer]
+
+### Output
+
+Recommended severity: 3
+
+Reasoning:
+
+The card is labeled "Today's rate", which implies the figure is current, yet it shows no clock time and no visible freshness indicator. The user's task is to judge whether *now* is a favorable moment to exchange, so the age of the rate is central to the decision, not a side detail. Exchange rates move within a day, and a stale or cached value presented as "today's" invites a wrong comparison against the benchmark. The user cannot tell whether the rate is seconds or hours old, so they cannot calibrate how far to trust the "more or less favorable" signal.
+
+- **Frequency:** Affects every use of the primary result card, on every visit.
+- **Impact:** Directly undermines the core decision the product exists to support. The system status (data age) is hidden exactly where the decision is made.
+- **Persistence:** Users cannot learn around it. Nothing on the primary card tells them the age, and the deeper date/freshness indication shows a date only if they find it, which does not resolve time-of-day uncertainty. Users who never dig deeper will assume "today's" means "live".
+- **Trust or market impact:** Money is at stake, and a misleading freshness claim can erode trust once users notice a discrepancy with another source.
+- **Mitigating factors:** Freshness information exists deeper in the interface, and the backend already has the timestamp, so this is a presentation gap and not missing data. Consequences depend on how volatile the pair is and how fast the underlying data actually updates, which is not evidenced here. That keeps it below catastrophic.
+
+Screen or system:
+
+SCREEN. The defect is where and how the status is presented on the primary result card (a missing timestamp beside the rate and a potentially misleading label). The system already holds the timestamp, so no backend or data-pipeline change is implied.
+
+What would make the severity one level higher:
+
+Evidence that the rate is often materially stale (cached for hours, or from a previous day or market close) while still labeled "Today's rate", or that the deeper freshness indicator can contradict the label. Also relevant: the product being used for large or time-sensitive transfers, or users making decisions on volatile pairs with real financial loss and no other way to detect the staleness. That would make it a trust-breaking flaw with direct money impact (severity 4).
+
+What would make the severity one level lower:
+
+Evidence that the rate is reliably refreshed at a known cadence, so "today's" is accurate in practice, together with a visible date or freshness cue near the rate that most users notice (for example, an "as of" note in the card header or a persistent global banner). Low-stakes use, such as informational browsing only with clear disclaimers, would also support severity 2.
+
+---
+
+## Blind Arbiter 2 — 7-day benchmark window
+
+### Prompt
+
+You are acting as a blind Nielsen heuristic evaluation arbiter.
+
+Evaluate ONLY the evidence below. You do not know who built the product or who gave the original ratings.
+
+Product job:
+Help a user compare today's exchange rate with a recent benchmark before deciding whether now is a relatively more or less favorable time to exchange currencies.
+
+Observed behavior:
+- The interface describes a benchmark as a "7-day average".
+- It is also described as an average of daily close rates over the last 7 calendar days.
+- In calculation details, the benchmark used 5 daily observations.
+- The displayed observation window was 2026-09-19 to 2026-09-25.
+- The product was reviewed on 2026-09-27.
+- The implementation does not invent rates for days when no valid daily observation exists.
+- The main result does not prominently show the observation count or exact benchmark window.
+
+Possible relevant heuristics:
+#1 Visibility of System Status
+#2 Match Between the System and the Real World
+
+Severity scale:
+0 = not a usability problem
+1 = cosmetic
+2 = minor usability problem
+3 = major usability problem
+4 = usability catastrophe
+
+Consider:
+- frequency
+- impact
+- persistence / ability to learn around it
+- trust or market impact
+
+Also decide whether the problem is SCREEN or SYSTEM using this rule:
+SCREEN = the page already has all information required and the repair is mainly presentation.
+SYSTEM = fixing it requires different/new data or system behavior that the screen does not already possess.
+
+Answer in this exact format:
+
+Primary heuristic:
+[number + name]
+
+Recommended severity:
+[0-4]
+
+Screen or system:
+[SCREEN or SYSTEM]
+
+Reasoning:
+[brief evidence-based explanation]
+
+Minimum repair needed:
+[describe desired state, not implementation technology]
+
+### Output
+
+Primary heuristic:
+
+#1 Visibility of System Status
+
+Recommended severity:
+
+2
+
+Screen or system:
+
+SCREEN
+
+Reasoning:
+
+The benchmark is labeled a "7-day average" and described as an average of daily closes over the last 7 calendar days, but the calculation actually used 5 observations. The window shown (2026-09-19 to 2026-09-25) spans 7 calendar days (Sat 19 to Fri 25), and 19-20 Sep are a weekend, which plausibly explains the 5 observations. So the label is defensible on calendar terms but reads as "7 data points" to many users. The system state (5 observations, exact window) is known and displayed in the calculation details, yet it is absent from the main result, where the decision is made.
+
+I chose #1 over #2 because the core gap is that the system does not surface its own state (how many observations, which window) at the point of use. #2 is a secondary concern, since "7-day average" is a natural real-world phrase and the mismatch only arises from weekend or missing-data gaps.
+
+Severity is 2 rather than 3 for these reasons:
+
+- **Impact:** A 5-point average versus a 7-point average of closes rarely changes the "more or less favorable" signal materially. The benchmark is still honest, because the implementation does not fabricate missing days.
+- **Persistence:** The detail is discoverable in the calculation details, so users who care can find it.
+- **Trust:** The risk is a user who notices 5 observations later and feels the "7-day" claim was overstated. That is a credibility cost, but the numbers themselves are not wrong.
+- **Frequency:** Weekends and holidays recur every week, so the discrepancy will appear regularly, which keeps it from being cosmetic.
+- **Related concern:** The review date (09-27) is two days after the window end (09-25). Whether the benchmark excludes the most recent days is not visible on the main result, which adds to the lack of transparency, though it is not evidenced as a defect here.
+
+Minimum repair needed:
+
+The main result should state the benchmark in terms that match what was computed, for example the exact window and the number of daily observations used ("average of 5 daily closes, 19-25 Sep"), with a brief cue explaining that days without a valid close are not counted. The existing data already supports this, so no new data or calculation change is needed.
+
+---
+
+## Blind Arbiter 3 — “Favourable” wording
+
+### Prompt
+
+You are acting as a blind Nielsen heuristic evaluation arbiter.
+
+Evaluate ONLY the evidence below. You do not know who built the product, who raised the finding, or what severity anyone previously assigned.
+
+Product job:
+Help a user compare today's exchange rate with recent historical benchmarks before deciding whether the current rate is relatively more or less favorable.
+
+Observed behavior:
+- The result card may use wording such as “more favorable today” or “better for converting [currency A] to [currency B]”.
+- The judgment is primarily based on comparing the current rate against a 7-day or 30-day historical average.
+- The product can show calculation details explaining the comparison.
+- The page includes a disclaimer that the product provides exchange-rate comparison information only and is not financial advice.
+- The product does not appear to incorporate the user's personal financial circumstances, exchange fees, transaction size, urgency, longer-term market outlook, or other decision factors beyond the selected historical benchmark.
+- A reviewer argued that words such as “favorable” may sound more like a recommendation than the underlying evidence supports and could cause a user to rely too heavily on the product's conclusion.
+
+Possible relevant heuristics:
+#2 Match Between the System and the Real World
+#10 Help and Documentation
+
+Severity scale:
+0 = not a usability problem
+1 = cosmetic problem
+2 = minor usability problem
+3 = major usability problem
+4 = usability catastrophe
+
+Use these factors:
+- frequency: how often a user encounters the issue
+- impact: how much it interferes with the user's decision
+- persistence: whether users can learn around it
+- trust / market impact
+- whether the problem prevents the product's core job or instead changes how confidently the result should be interpreted
+
+Important:
+Do NOT treat financial subject matter alone as a reason to increase severity.
+Judge the usability problem shown by the evidence.
+Do NOT assume harm that is not supported by the evidence.
+
+Answer in this exact format:
+
+Primary heuristic:
+[number + name]
+
+Secondary heuristic, if any:
+[number + name, or NONE]
+
+Recommended severity:
+[0-4]
+
+Why this severity:
+[brief evidence-based explanation]
+
+Why it is not one level higher:
+[brief explanation]
+
+Why it is not one level lower:
+[brief explanation]
+
+Screen or system:
+[SCREEN or SYSTEM, with reason]
+
+Minimum repair needed:
+[describe the desired user-facing state, not implementation technology]
+
+Would the existing disclaimer materially reduce the severity?
+[YES / PARTLY / NO, with brief reason]
+
+### Output
+
+Primary heuristic:
+
+#2 Match Between the System and the Real World
+
+Secondary heuristic, if any:
+
+#10 Help and Documentation
+
+Recommended severity:
+
+2
+
+Why this severity:
+
+The card uses evaluative, advice-like wording ("more favorable today", "better for converting A to B"), but the evidence behind it is one comparison: the current rate against a 7-day or 30-day historical average. In everyday language, "favorable" or "better" suggests a judgment that accounts for the user's own situation (fees, transaction size, urgency, outlook). The system accounts for none of these, so the word promises more than the computation delivers. The product still does its core job: it compares the rate with a benchmark and shows the calculation details. What changes is how confidently users may read the conclusion. Users who skip the details could over-rely on it, and the issue appears on every result card, so it is not rare. But the evidence shows a mismatch in wording, not a blocked task or a wrong number.
+
+Why it is not one level higher:
+
+Nothing in the evidence shows that the comparison is miscalculated, that the user is prevented from completing the task, or that the wording forces a decision. The calculation details and a disclaimer exist, and the user still makes the exchange decision. Judging it major would require assuming actual over-reliance or financial harm, which the evidence does not show. Financial subject matter alone does not justify raising it.
+
+Why it is not one level lower:
+
+The wording appears in the most prominent element, the result card, on every use, while the qualifying information (the benchmark basis, the missing personal factors) sits in secondary places. Users cannot easily learn around it, because the card itself gives no cue that "favorable" means only "above or below a historical average". That is more than cosmetic: it affects how much weight users give the primary output, which is the product's whole purpose.
+
+Screen or system:
+
+SCREEN. The benchmark basis and the comparison result are already known to the page, so the fix is presentation: how the conclusion is worded and what is stated beside it. No new data or behavior is needed. Incorporating fees or personal circumstances would be a new feature, not the repair for this finding.
+
+Minimum repair needed:
+
+The result card should describe what was actually compared in plain, non-advisory terms, for example that today's rate is above or below the 7-day (or 30-day) average, with the size of the difference, instead of a bare "favorable" or "better" verdict. If an evaluative word stays, the basis ("compared with the 30-day average") should sit directly beside it. The card should also carry a short, visible note that fees, amount, timing needs, and outlook are not included in this comparison.
+
+Would the existing disclaimer materially reduce the severity?
+
+PARTLY. The disclaimer sets a general expectation that this is information and not advice, which reduces the risk of over-reading. But it is generic and placed away from the result card, and users tend not to connect a page-level disclaimer to a specific verdict word. It does not tell the user what the "favorable" judgment leaves out, so the mismatch at the point of use remains.
