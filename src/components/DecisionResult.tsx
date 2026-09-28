@@ -1,7 +1,7 @@
 import React from 'react';
 import { BenchmarkType, ComparisonResult, FxCurrentData, FxHistoryData } from '../types';
 import { SecondaryTrendChart } from './SecondaryTrendChart';
-import { CheckCircle2, AlertCircle, HelpCircle, RotateCcw, ChevronDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, Minus, RotateCcw, ChevronDown } from 'lucide-react';
 import { formatRate } from '../utils/calculations';
 import { getCurrencyInfo } from '../data/currencies';
 import { formatRateFreshness } from '../utils/freshness';
@@ -66,12 +66,13 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
                   : 'bg-amber-600 text-white shadow-xs'
             }`}
           >
+            {/* Direction of today's rate vs. the benchmark (not a verdict) */}
             {isUnchanged ? (
-              <HelpCircle className="w-6 h-6 stroke-[2.2]" />
+              <Minus className="w-6 h-6 stroke-[2.2]" />
             ) : isMoreFavorable ? (
-              <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
+              <ArrowUp className="w-6 h-6 stroke-[2.2]" />
             ) : (
-              <AlertCircle className="w-6 h-6 stroke-[2.2]" />
+              <ArrowDown className="w-6 h-6 stroke-[2.2]" />
             )}
           </div>
 

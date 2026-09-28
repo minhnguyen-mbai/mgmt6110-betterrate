@@ -73,18 +73,18 @@ test('2. user can select the 7-day or 30-day benchmark; the result updates witho
   assert.equal(selectComparison(s)?.benchmarkName, '30-day average');
 });
 
-test('9. decision result: favorable and less favorable wording', () => {
+test('9. decision result: above and below wording', () => {
   const usdSgd = run([{ type: 'SET_CURRENCY', side: 'have', code: 'USD' }, { type: 'SET_CURRENCY', side: 'want', code: 'SGD' }]);
   const better = selectComparison(checked(usdSgd, 1.2798, 1.2769, 1.28));
   assert.ok(better);
-  assert.equal(better.statusText, 'Better for converting USD to SGD');
-  assert.equal(better.headlineComparison, '0.23% more favorable today');
+  assert.equal(better.statusText, 'Converting USD to SGD');
+  assert.equal(better.headlineComparison, '0.23% above the 7-day average');
   assert.equal(better.todayRate, 1.2798);
   assert.equal(better.benchmarkRate, 1.2769);
 
   const worse = selectComparison(checked(usdSgd, 1.27, 1.2769, 1.28));
-  assert.equal(worse?.statusText, 'Less favorable for converting USD to SGD');
-  assert.match(worse?.headlineComparison ?? '', /less favorable today$/);
+  assert.equal(worse?.statusText, 'Converting USD to SGD');
+  assert.match(worse?.headlineComparison ?? '', /below the 7-day average$/);
 
   assert.equal(selectComparison(usdSgd), null, 'no result before the rate is checked');
 });
@@ -100,11 +100,13 @@ test('10. amount feature removed: no amount state or monetary result fields', ()
 
 test('9. swap keeps the same market quote data and flips the decision direction', () => {
   let s = checked(run([{ type: 'SET_CURRENCY', side: 'have', code: 'SGD' }, { type: 'SET_CURRENCY', side: 'want', code: 'EUR' }]), 1.458, 1.4634, 1.4716);
-  assert.equal(selectComparison(s)?.statusText, 'Better for converting SGD to EUR');
+  assert.equal(selectComparison(s)?.statusText, 'Converting SGD to EUR');
+  assert.match(selectComparison(s)?.headlineComparison ?? '', / above the 7-day average$/);
   s = comparisonReducer(s, { type: 'SWAP' });
   assert.deepEqual([s.haveCurrency, s.wantCurrency], ['EUR', 'SGD']);
   assert.equal(s.status, 'success');
-  assert.equal(selectComparison(s)?.statusText, 'Less favorable for converting EUR to SGD');
+  assert.equal(selectComparison(s)?.statusText, 'Converting EUR to SGD');
+  assert.match(selectComparison(s)?.headlineComparison ?? '', / below the 7-day average$/);
 });
 
 test('10. changing to a different pair clears the stale result', () => {
@@ -149,7 +151,8 @@ test('11. stale responses cannot overwrite the current selection', () => {
     current: current('GBP', 'SGD', 1.6963),
     history: history('GBP', 'SGD', 1.7023, 1.7141),
   });
-  assert.equal(selectComparison(done)?.statusText, 'Better for converting SGD to GBP');
+  assert.equal(selectComparison(done)?.statusText, 'Converting SGD to GBP');
+  assert.match(selectComparison(done)?.headlineComparison ?? '', / above the 7-day average$/);
 });
 
 test('normalized errors map to page states; loading keeps the selection', () => {

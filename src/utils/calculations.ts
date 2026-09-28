@@ -41,7 +41,6 @@ export function calculateComparison(
   // Determine direction purely from currency inputs
   const isBuyingBase = input.wantCurrency === marketBase;
   const directionCode = isBuyingBase ? 'BUY_BASE' : 'SELL_BASE';
-  const conversion = `converting ${input.haveCurrency} to ${input.wantCurrency}`;
   const directionLabel = `Converting ${input.haveCurrency} to ${input.wantCurrency}`;
 
   // Quote both rates as "1 have = X want". Inverting both (1 / average for the benchmark)
@@ -73,30 +72,27 @@ export function calculateComparison(
   const todayQuote = `1 ${base.code} = ${formatRate(todayRate)} ${quote.code}`;
   const benchmarkQuote = `${formatRate(benchmarkRate)} ${quote.code}`;
 
-  // Wording: strictly direction-aware, objective, no forbidden promotional words ("good rate", "best time", etc.)
-  let statusText = '';
-  let headlineComparison = '';
-  let explanation = '';
+  // Wording: descriptive only. The comparison says where today's rate sits relative to the selected
+  // average; it does not judge whether converting now is better or worse for the user.
+  const position = isUnchanged ? 'in line with' : rawPercentDiff > 0 ? 'above' : 'below';
 
-  // What the percentage is measured against, in neutral terms: the same unchanged state as the
-  // headline, otherwise the sign of (today - benchmark) / benchmark in the displayed direction
+  // The direction being converted (the pill above the headline)
+  const statusText = directionLabel;
+
+  // Headline: the percentage with its basis (above / below / in line with the selected benchmark)
+  const headlineComparison = isUnchanged
+    ? `Approximately in line with the ${benchmarkName}`
+    : `${percentFormatted}% ${position} the ${benchmarkName}`;
+
+  // What that means in plain terms for the displayed quote (1 have = X want)
+  const amount = isUnchanged ? 'about the same' : rawPercentDiff > 0 ? 'more' : 'less';
   const benchmarkContext = isUnchanged
-    ? `Today’s rate is approximately in line with the ${benchmarkName}.`
-    : `Today’s rate is ${percentFormatted}% ${rawPercentDiff > 0 ? 'above' : 'below'} the ${benchmarkName}.`;
+    ? `Today’s rate gives about the same ${quote.code} per ${base.code} as the ${benchmarkName}.`
+    : `Today’s rate gives ${amount} ${quote.code} per ${base.code} than the ${benchmarkName}.`;
 
-  if (isUnchanged) {
-    statusText = `Approximately unchanged for ${conversion}`;
-    headlineComparison = 'Approximately unchanged today';
-    explanation = `Today’s rate (${todayQuote}) is virtually identical to the ${benchmarkName} (${benchmarkQuote}). There is almost no rate difference compared with recent rates.`;
-  } else if (isMoreFavorable) {
-    statusText = `Better for ${conversion}`;
-    headlineComparison = `${percentFormatted}% more favorable today`;
-    explanation = `Today’s rate (${todayQuote}) is higher than the ${benchmarkName} (${benchmarkQuote}). When ${conversion}, a higher rate means you receive more ${quote.plural} for each ${base.name}.`;
-  } else {
-    statusText = `Less favorable for ${conversion}`;
-    headlineComparison = `${percentFormatted}% less favorable today`;
-    explanation = `Today’s rate (${todayQuote}) is lower than the ${benchmarkName} (${benchmarkQuote}). When ${conversion}, a lower rate means you receive less ${quote.plural} for each ${base.name}.`;
-  }
+  const explanation = isUnchanged
+    ? `Today’s rate (${todayQuote}) is virtually identical to the ${benchmarkName} (${benchmarkQuote}).`
+    : `Today’s rate (${todayQuote}) is ${percentFormatted}% ${position} the ${benchmarkName} (${benchmarkQuote}). At this rate, each ${base.name} converts to ${amount} ${quote.plural} than at the ${benchmarkName}.`;
 
   return {
     directionLabel,

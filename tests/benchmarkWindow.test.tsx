@@ -137,8 +137,8 @@ test('Cases E/F/G: Bug #1 direction, Bug #3 freshness and Bug #4 context are int
   assert.match(week.text, /Today’s rate 1 VND = 0\.0000\d+ SGD/);
   assert.ok(!week.text.includes('1 SGD ='));
   assert.match(week.text, /Rate as of Sep 2[78], 2026, \d{1,2}:\d{2} [AP]M/);
-  assert.match(week.text, /Today’s rate is [\d.]+% above the 7-day average\./);
+  assert.match(week.text, /[\d.]+% above the 7-day average/);
 
   const month = card(comparisonReducer(loaded('7d'), { type: 'SET_BENCHMARK', benchmark: '30d' }));
-  assert.match(month.text, /Today’s rate is [\d.]+% above the 30-day average\./);
+  assert.match(month.text, /[\d.]+% above the 30-day average/);
 });

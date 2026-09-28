@@ -23,14 +23,15 @@ test('VND -> SGD is quoted as 1 VND = X SGD with the same decision', () => {
   assert.equal(r.isMoreFavorable, true);
   // Percentage of the displayed VND -> SGD rates: 19850 / 19620 - 1
   assert.equal(r.percentDifference, 1.17);
-  assert.equal(r.statusText, 'Better for converting VND to SGD');
+  assert.equal(r.statusText, 'Converting VND to SGD');
+  assert.equal(r.headlineComparison, '1.17% above the 7-day average');
   assert.equal(
     r.explanation,
-    'Today’s rate (1 VND = 0.00005097 SGD) is higher than the 7-day average (0.00005038 SGD). When converting VND to SGD, a higher rate means you receive more Singapore Dollars for each Vietnamese Dong.'
+    'Today’s rate (1 VND = 0.00005097 SGD) is 1.17% above the 7-day average (0.00005038 SGD). At this rate, each Vietnamese Dong converts to more Singapore Dollars than at the 7-day average.'
   );
 });
 
-test('SGD -> VND: higher rate is more favorable', () => {
+test('SGD -> VND: a lower rate than the benchmark is described as below it', () => {
   const r = calculateComparison(
     { haveCurrency: 'SGD', wantCurrency: 'VND', benchmark: '30d' },
     19620,
@@ -39,7 +40,8 @@ test('SGD -> VND: higher rate is more favorable', () => {
   );
   assert.equal(r.directionCode, 'SELL_BASE');
   assert.equal(r.isMoreFavorable, false);
-  assert.equal(r.statusText, 'Less favorable for converting SGD to VND');
+  assert.equal(r.statusText, 'Converting SGD to VND');
+  assert.equal(r.headlineComparison, '0.41% below the 30-day average');
 });
 
 test('USD -> SGD uses USD as base', () => {
@@ -72,7 +74,7 @@ test('EUR -> SGD and SGD -> JPY use the market quote', () => {
   assert.equal(eur.directionCode, 'BUY_BASE');
   assert.equal(eur.isMoreFavorable, true, 'lower SGD cost per EUR is better when buying EUR');
   assert.equal(eur.percentDifference, 0.36);
-  assert.equal(eur.headlineComparison, '0.36% more favorable today');
+  assert.equal(eur.headlineComparison, '0.36% above the 7-day average');
 
   const jpy = calculateComparison(
     { haveCurrency: 'SGD', wantCurrency: 'JPY', benchmark: '30d' },
@@ -83,5 +85,6 @@ test('EUR -> SGD and SGD -> JPY use the market quote', () => {
   assert.equal(jpy.directionCode, 'SELL_BASE');
   assert.equal(jpy.isMoreFavorable, true);
   assert.equal(jpy.percentDifference, 0.42);
-  assert.equal(jpy.statusText, 'Better for converting SGD to JPY');
+  assert.equal(jpy.statusText, 'Converting SGD to JPY');
+  assert.match(jpy.headlineComparison, /^0\.42% above the 30-day average$/);
 });

@@ -33,11 +33,11 @@ export interface ComparisonResult {
   benchmarkRate: number; // same direction as todayRate
   rateDifference: number; // benchmarkRate - todayRate, in quote currency per base unit
   percentDifference: number; // e.g. 1.16
-  isMoreFavorable: boolean;
+  isMoreFavorable: boolean; // today's displayed rate is above the benchmark (and not unchanged); drives the card's styling only
   isUnchanged: boolean;
-  statusText: string; // "Better for converting VND to SGD" or "Less favorable for converting SGD to VND"
-  headlineComparison: string; // "1.16% more favorable today" or "1.16% less favorable today"
-  benchmarkContext: string; // "Today’s rate is 1.16% above the 7-day average." (or "below", or "approximately in line with")
+  statusText: string; // the direction being converted, e.g. "Converting VND to SGD"
+  headlineComparison: string; // "1.16% above the 7-day average", "… below …" or "Approximately in line with the 7-day average"
+  benchmarkContext: string; // "Today’s rate gives more SGD per VND than the 7-day average." (or "less", or "about the same … as")
   explanation: string; // plain language rationale
 }
 

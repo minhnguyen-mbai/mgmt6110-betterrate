@@ -108,7 +108,7 @@ test('Case A: VND -> SGD with current below benchmark gives a negative differenc
   assert.equal(c.today, 'Today’s rate 1 VND = 0.0000489 SGD');
   assert.equal(c.benchmark, '7-day average 1 VND = 0.0000491 SGD');
   assert.equal(c.difference, 'Difference −0.0000002008 SGD per VND');
-  assert.ok(text(c.html).includes('Less favorable for converting VND to SGD'));
+  assert.ok(text(c.html).includes('below the 7-day average'));
 });
 
 test('Case B: SGD -> VND is quoted as 1 SGD = X VND', () => {
@@ -124,7 +124,7 @@ test('Case B: SGD -> VND is quoted as 1 SGD = X VND', () => {
   assert.equal(c.benchmark, '7-day average 1 SGD = 19,850 VND');
   assert.equal(c.difference, 'Difference −230 VND per SGD');
   assert.ok(!c.html.includes('1 VND ='));
-  assert.ok(text(c.html).includes('Less favorable for converting SGD to VND'));
+  assert.ok(text(c.html).includes('below the 7-day average'));
 });
 
 test('Case C: GBP -> MYR and MYR -> GBP follow the same 1 FROM = X TO rule', () => {
@@ -152,7 +152,7 @@ test('Case D: swapping the pair shows the reciprocal quote with swapped labels a
   assert.deepEqual([after.baseCurrency, after.quoteCurrency], ['SGD', 'VND']);
   assert.ok(near(before.todayRate * after.todayRate, 1), 'today rates are reciprocal');
   assert.ok(near(before.benchmarkRate * after.benchmarkRate, 1), 'benchmarks are reciprocal');
-  assert.notEqual(before.isMoreFavorable, after.isMoreFavorable, 'what is better one way is worse the other');
+  assert.notEqual(before.isMoreFavorable, after.isMoreFavorable, 'above the benchmark one way is below it the other');
 
   const c = card(s);
   assert.equal(c.today, 'Today’s rate 1 SGD = 20,295.77 VND');
@@ -167,7 +167,7 @@ test('difference sign always equals current minus benchmark in the displayed dir
       const r = calculateComparison({ haveCurrency: have, wantCurrency: want, benchmark: '7d' }, today, bench, '7-day average');
       const signed = r.todayRate - r.benchmarkRate;
       assert.equal(r.rateDifference, -signed);
-      assert.equal(r.isMoreFavorable, signed > 0, `${have} -> ${want}: higher displayed rate is more favorable`);
+      assert.equal(r.isMoreFavorable, signed > 0, `${have} -> ${want}: a higher displayed rate is above the benchmark`);
       assert.equal(r.percentDifference, Number((Math.abs(signed / r.benchmarkRate) * 100).toFixed(2)));
     }
   }

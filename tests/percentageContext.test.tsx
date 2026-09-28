@@ -16,6 +16,8 @@ import { BenchmarkType, CurrencyCode } from '../src/types';
 /**
  * PS4 Bug #4: the primary card says what the percentage is measured against:
  * above / below / in line with the selected benchmark, which it names.
+ * Since Bug #6 the percentage and its basis are the headline, and the context line says what that
+ * means for the displayed quote, so the comparison is not stated twice.
  */
 
 const noop = () => {};
@@ -61,6 +63,7 @@ function card(state: ComparisonState) {
   const primary = html.slice(html.indexOf('id="primary-interpretation-card"'), html.indexOf('id="trend-details"'));
   return {
     text: text(primary),
+    headline: text(primary.match(/<h2 id="primary-interpretation-headline"[^>]*>(.*?)<\/h2>/)?.[1] ?? ''),
     context: text(primary.match(/<p id="benchmark-context"[^>]*>(.*?)<\/p>/)?.[1] ?? ''),
   };
 }
@@ -70,23 +73,26 @@ const UNSUPPORTED = ['small', 'large', 'good', 'bad', 'normal', 'unusual', 'typi
 test('Case A: today above the benchmark says "above" and names the benchmark', () => {
   // USD -> SGD is quoted as fetched (1 USD = X SGD)
   const c = card(loaded('USD', 'SGD', 1.0022, 1.0, 1.0));
-  assert.equal(c.context, 'Today’s rate is 0.22% above the 7-day average.');
-  for (const word of UNSUPPORTED) assert.ok(!c.context.toLowerCase().includes(word), word);
+  assert.equal(c.headline, '0.22% above the 7-day average');
+  assert.equal(c.context, 'Today’s rate gives more SGD per USD than the 7-day average.');
+  for (const word of UNSUPPORTED) assert.ok(!c.text.toLowerCase().includes(word), word);
 });
 
 test('Case B: today below the benchmark says "below"', () => {
   const c = card(loaded('USD', 'SGD', 0.9937, 1.0, 1.0));
-  assert.equal(c.context, 'Today’s rate is 0.63% below the 7-day average.');
+  assert.equal(c.headline, '0.63% below the 7-day average');
+  assert.equal(c.context, 'Today’s rate gives less SGD per USD than the 7-day average.');
 });
 
 test('Cases C/D: the context names the selected benchmark and follows a benchmark switch', () => {
   // Above the 7-day average but below the 30-day average
   let s = loaded('USD', 'SGD', 1.0022, 1.0, 1.01);
-  assert.equal(card(s).context, 'Today’s rate is 0.22% above the 7-day average.');
+  assert.equal(card(s).headline, '0.22% above the 7-day average');
 
   s = comparisonReducer(s, { type: 'SET_BENCHMARK', benchmark: '30d' });
   const c30 = card(s);
-  assert.equal(c30.context, 'Today’s rate is 0.77% below the 30-day average.');
+  assert.equal(c30.headline, '0.77% below the 30-day average');
+  assert.equal(c30.context, 'Today’s rate gives less SGD per USD than the 30-day average.');
   assert.ok(!c30.text.includes('7-day'), 'no stale 7-day reference in the primary card');
 
   s = comparisonReducer(s, { type: 'SET_BENCHMARK', benchmark: '7d' });
@@ -96,20 +102,21 @@ test('Cases C/D: the context names the selected benchmark and follows a benchmar
 test('Case E: an approximately unchanged result never says "0.00% above/below"', () => {
   for (const rate of [1.0, 1.00001, 0.99999]) {
     const c = card(loaded('USD', 'SGD', rate, 1.0, 1.0));
-    assert.equal(c.context, 'Today’s rate is approximately in line with the 7-day average.', String(rate));
+    assert.equal(c.headline, 'Approximately in line with the 7-day average', String(rate));
+    assert.equal(c.context, 'Today’s rate gives about the same SGD per USD as the 7-day average.', String(rate));
     assert.ok(!/0(\.0+)?% (above|below)/.test(c.text), String(rate));
   }
   // Unchanged by the existing absolute threshold even when the percentage rounds to 0.01%
   const threshold = card(loaded('USD', 'SGD', 1.00009, 1.0, 1.0));
-  assert.ok(threshold.text.includes('Approximately unchanged today'));
-  assert.equal(threshold.context, 'Today’s rate is approximately in line with the 7-day average.');
+  assert.equal(threshold.headline, 'Approximately in line with the 7-day average');
+  assert.ok(!threshold.text.includes('0.01%'));
 });
 
 test('the context percentage and sign match the displayed rates', () => {
   const s = loaded('VND', 'SGD', 19620, 19850, 19700);
   const r = selectComparison(s)!;
   const expected = ((r.todayRate - r.benchmarkRate) / r.benchmarkRate) * 100;
-  assert.equal(card(s).context, `Today’s rate is ${Math.abs(expected).toFixed(2)}% above the 7-day average.`);
+  assert.equal(card(s).headline, `${Math.abs(expected).toFixed(2)}% above the 7-day average`);
   assert.ok(expected > 0, '1 VND buys more SGD today');
 });
 

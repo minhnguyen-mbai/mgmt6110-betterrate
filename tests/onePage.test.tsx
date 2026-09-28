@@ -133,21 +133,21 @@ test('9/14. one decision card: decision, today, benchmark, difference; conclusio
   const html = page(loadedState('USD', 'SGD', 1.2797, 1.2769, 1.28));
   const t = text(html);
   assert.ok(html.includes('id="input-form-card"') && html.includes('id="decision-result"'));
-  assert.ok(t.includes('Better for converting USD to SGD'));
-  assert.ok(t.includes('0.22% more favorable today'));
+  assert.ok(t.includes('Converting USD to SGD'));
+  assert.ok(t.includes('0.22% above the 7-day average'));
   assert.ok(t.includes('Today’s rate 1 USD = 1.2797 SGD'));
   assert.ok(t.includes('7-day average 1 USD = 1.2769 SGD'));
   assert.ok(t.includes('Difference +0.0028 SGD per USD'));
 
-  assert.equal(count(t, 'Better for converting USD to SGD'), 1, 'decision statement shown once');
-  assert.equal(count(t, 'more favorable today'), 1, 'headline shown once');
+  assert.equal(count(t, 'Converting USD to SGD'), 1, 'direction shown once');
+  assert.equal(count(t, 'above the 7-day average'), 1, 'headline shown once');
   assert.ok(!html.includes('id="chart-plain-explainer"'), 'chart no longer restates the decision');
   assert.ok(!t.includes('Favorable vs. benchmark'));
   assert.ok(!html.includes('id="plain-language-explanation"'), 'details no longer restate the decision');
   assert.ok(!t.includes('How BetterRate works'));
 
   const worse = text(page(loadedState('USD', 'SGD', 1.27, 1.2769, 1.28)));
-  assert.ok(worse.includes('Less favorable for converting USD to SGD'));
+  assert.ok(worse.includes('0.54% below the 7-day average'));
   assert.ok(worse.includes('Difference −0.0069 SGD per USD'));
 });
 
@@ -194,13 +194,13 @@ test('11/12/13. trend and calculation details are collapsed disclosures, in orde
 
 test('6/18. multi-currency and swapped direction render the right decision', () => {
   const eurSgd = text(page(loadedState('EUR', 'SGD', 1.458, 1.4634, 1.4716)));
-  assert.ok(eurSgd.includes('Less favorable for converting EUR to SGD'));
+  assert.ok(eurSgd.includes('Converting EUR to SGD') && eurSgd.includes('below the 7-day average'));
   assert.ok(eurSgd.includes('Today’s rate 1 EUR = 1.458 SGD'));
 
   const sgdEur = text(page(loadedState('SGD', 'EUR', 1.458, 1.4634, 1.4716)));
-  assert.ok(sgdEur.includes('Better for converting SGD to EUR'));
+  assert.ok(sgdEur.includes('Converting SGD to EUR') && sgdEur.includes('above the 7-day average'));
 
   const vnd = text(page(loadedState('VND', 'SGD', 20295.77, 20366.36, 20450.25)));
-  assert.ok(vnd.includes('Better for converting VND to SGD'));
+  assert.ok(vnd.includes('Converting VND to SGD') && vnd.includes('above the 7-day average'));
   assert.ok(vnd.includes('Today’s rate 1 VND = 0.00004927 SGD'));
 });
