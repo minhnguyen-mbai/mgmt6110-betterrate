@@ -42,6 +42,7 @@ export const ComparisonPage: React.FC<ComparisonPageProps> = ({
         onSwap={onSwap}
         onBenchmarkChange={onBenchmarkChange}
         onCheck={onCheck}
+        hasResult={Boolean(result && state.data)}
         haveSelectRef={haveSelectRef}
       />
 

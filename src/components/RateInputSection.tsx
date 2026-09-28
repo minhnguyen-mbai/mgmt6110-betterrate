@@ -13,6 +13,8 @@ interface RateInputSectionProps {
   onSwap: () => void;
   onBenchmarkChange: (benchmark: BenchmarkType) => void;
   onCheck: () => void;
+  /** A result for the current selection is shown (it then follows benchmark changes and swaps) */
+  hasResult?: boolean;
   haveSelectRef?: React.Ref<HTMLSelectElement>;
 }
 
@@ -29,6 +31,7 @@ export const RateInputSection: React.FC<RateInputSectionProps> = ({
   onSwap,
   onBenchmarkChange,
   onCheck,
+  hasResult = false,
   haveSelectRef,
 }) => {
   const have = getCurrencyInfo(haveCurrency);
@@ -202,23 +205,31 @@ export const RateInputSection: React.FC<RateInputSectionProps> = ({
           </div>
         </div>
 
-        {/* Primary CTA */}
+        {/* Primary CTA: fetches the rate for the selected pair. Once a result is shown it follows
+            benchmark changes and swaps without another request, so the button is replaced by a note;
+            choosing a different currency clears the result and brings the button back. */}
         <div className="pt-2">
-          <button
-            id="check-rate-btn"
-            type="button"
-            onClick={onCheck}
-            disabled={isLoading}
-            aria-busy={isLoading}
-            className={`w-full py-4 px-6 min-h-[52px] rounded-xl font-semibold text-base shadow-sm transition-all flex items-center justify-center gap-2 group ${
-              !isLoading
-                ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer active:scale-[0.99]'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <span>{isLoading ? 'Comparing today’s rate…' : 'Compare today’s rate'}</span>
-            {!isLoading && <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>}
-          </button>
+          {hasResult ? (
+            <p id="live-update-note" className="text-xs sm:text-sm text-slate-500 text-center">
+              The result below updates when you change the benchmark or swap currencies.
+            </p>
+          ) : (
+            <button
+              id="check-rate-btn"
+              type="button"
+              onClick={onCheck}
+              disabled={isLoading}
+              aria-busy={isLoading}
+              className={`w-full py-4 px-6 min-h-[52px] rounded-xl font-semibold text-base shadow-sm transition-all flex items-center justify-center gap-2 group ${
+                !isLoading
+                  ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer active:scale-[0.99]'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <span>{isLoading ? 'Comparing today’s rate…' : 'Compare today’s rate'}</span>
+              {!isLoading && <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>}
+            </button>
+          )}
         </div>
       </div>
 
