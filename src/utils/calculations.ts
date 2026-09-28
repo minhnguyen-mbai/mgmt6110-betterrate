@@ -78,6 +78,12 @@ export function calculateComparison(
   let headlineComparison = '';
   let explanation = '';
 
+  // What the percentage is measured against, in neutral terms: the same unchanged state as the
+  // headline, otherwise the sign of (today - benchmark) / benchmark in the displayed direction
+  const benchmarkContext = isUnchanged
+    ? `Today’s rate is approximately in line with the ${benchmarkName}.`
+    : `Today’s rate is ${percentFormatted}% ${rawPercentDiff > 0 ? 'above' : 'below'} the ${benchmarkName}.`;
+
   if (isUnchanged) {
     statusText = `Approximately unchanged for ${conversion}`;
     headlineComparison = 'Approximately unchanged today';
@@ -106,6 +112,7 @@ export function calculateComparison(
     isUnchanged,
     statusText,
     headlineComparison,
+    benchmarkContext,
     explanation,
   };
 }

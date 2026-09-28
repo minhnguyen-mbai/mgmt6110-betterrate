@@ -37,6 +37,7 @@ export interface ComparisonResult {
   isUnchanged: boolean;
   statusText: string; // "Better for converting VND to SGD" or "Less favorable for converting SGD to VND"
   headlineComparison: string; // "1.16% more favorable today" or "1.16% less favorable today"
+  benchmarkContext: string; // "Today’s rate is 1.16% above the 7-day average." (or "below", or "approximately in line with")
   explanation: string; // plain language rationale
 }
 

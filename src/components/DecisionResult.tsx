@@ -93,6 +93,9 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
             >
               {result.headlineComparison}
             </h2>
+            <p id="benchmark-context" className="mt-1 text-sm text-slate-700">
+              {result.benchmarkContext}
+            </p>
           </div>
         </div>
 
