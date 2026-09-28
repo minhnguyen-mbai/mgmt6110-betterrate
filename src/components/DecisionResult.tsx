@@ -5,6 +5,7 @@ import { CheckCircle2, AlertCircle, HelpCircle, RotateCcw, ChevronDown } from 'l
 import { formatRate } from '../utils/calculations';
 import { getCurrencyInfo } from '../data/currencies';
 import { formatRateFreshness } from '../utils/freshness';
+import { formatBenchmarkWindow } from '../utils/benchmarkWindow';
 
 interface DecisionResultProps {
   benchmark: BenchmarkType;
@@ -31,6 +32,7 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
   const quote = getCurrencyInfo(result.quoteCurrency);
   const benchmarkDetail = history.benchmarks[benchmark];
   const freshness = formatRateFreshness(current.lastRefreshed, current.timeZone);
+  const benchmarkWindow = formatBenchmarkWindow(benchmarkDetail);
   // History is fetched as the market quote; show it in the same direction as the result
   const dailyPoints = (history.daily || []).map((p) =>
     result.directionCode === 'BUY_BASE' ? { date: p.date, close: 1 / p.close } : p
@@ -109,6 +111,7 @@ export const DecisionResult: React.FC<DecisionResultProps> = ({
           <div id="benchmark-rate-row" className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <dt className="text-slate-600">{result.benchmarkName}</dt>
             <dd className="font-semibold text-slate-900">1 {base.code} = {formatRate(result.benchmarkRate)} {quote.code}</dd>
+            <dd id="benchmark-window" className="basis-full text-right text-xs text-slate-500">{benchmarkWindow}</dd>
           </div>
           <div id="rate-difference-row" className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <dt className="text-slate-600">Difference</dt>
