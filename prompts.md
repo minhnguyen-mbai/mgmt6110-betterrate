@@ -2715,3 +2715,310 @@ The result card should describe what was actually compared in plain, non-advisor
 Would the existing disclaimer materially reduce the severity?
 
 PARTLY. The disclaimer sets a general expectation that this is information and not advice, which reduces the risk of over-reading. But it is generic and placed away from the result card, and users tend not to connect a page-level disclaimer to a specific verdict word. It does not tell the user what the "favorable" judgment leaves out, so the mismatch at the point of use remains.
+
+
+
+
+
+
+
+
+# PS4 — Coding Agent Arguments Against Repairs
+
+> **Source note:** Sections for Bugs #2–#8 and #10 below reproduce the substance of the coding-agent argument/counterargument outputs preserved in the working logs. The original verbatim pre-code argument for Bug #1 was not present in the available pasted logs, so Bug #1 is explicitly marked as a faithful reconstruction from the recorded scope decision. If the original Bug #1 Claude exchange is still available, replace that subsection with the verbatim response.
+
+---
+
+## Bug #1 — Quote direction mismatch
+
+### Coding-agent argument against the proposed repair
+**Status:** Reconstructed summary from the recorded scope decision; not presented as a verbatim transcript.
+
+The proposed repair was to make the displayed exchange rate follow the user-selected `I HAVE → I WANT` direction.
+
+The main concern was that this should remain a **presentation repair**, not silently change the benchmark mathematics or provider architecture.
+
+1. The provider and internal calculation can legitimately keep a canonical market direction. The usability problem is that the primary result, benchmark and Difference were shown in a direction that conflicted with the user-selected conversion.
+2. The smallest repair is therefore to transform the already-computed current rate and benchmark into the displayed `FROM → TO` direction and calculate the displayed Difference consistently in that direction.
+3. The repair must be applied everywhere the rate appears — primary result, benchmark, Difference, calculation details and trend — otherwise the screen would become internally inconsistent.
+4. A key mathematical caveat is that:
+   - `1 / average(rate)`
+   - is **not** generally equal to
+   - `average(1 / rate)`.
+5. Changing from the reciprocal of the existing benchmark average to an average of reciprocal historical rates could alter the benchmark value and potentially change the above/below verdict. That would be a benchmark-definition change, not merely a quote-direction repair.
+6. Therefore, the repair should preserve the existing benchmark semantics and invert the already-computed benchmark for display when the selected direction is reversed.
+7. Small reciprocal rates, especially VND→SGD, must retain enough precision so that the display does not collapse to zero.
+8. The repair should not touch provider routing, benchmark observation selection or historical derivation.
+
+**Decision:** Proceed with the smallest SCREEN-level repair: make every user-facing rate follow `I HAVE → I WANT`, while preserving existing benchmark/provider semantics.
+
+**Important argument that changed scope:** Do **not** change benchmark mathematics in this commit merely because reciprocal display raises the separate `1 / average` versus `average of reciprocals` question.
+
+---
+
+## Bug #2 — Provider failure / recovery for VND→AUD and VND→THB
+
+### Coding-agent argument against the proposed repair
+
+I tested whether this was a provider outage or quota problem before coding. It isn't.
+
+- **Request path.** The app always fetches the higher-value currency first, so VND→AUD requests AUD→VND, first `/api/fx-current`, then `/api/fx-history`. VND pairs use Alpha Vantage and GBP→MYR uses Frankfurter.
+  - Current rate: one direct Alpha Vantage quote for that pair (AUD→VND).
+  - History: built from the USD→AUD and USD→VND daily series, a cross-rate via USD.
+
+- **Live evidence from the deployed app:**
+  - `fx-current AUD→VND`: `502 PROVIDER_ERROR`, not cached, same on repeat.
+  - `fx-current THB→VND`: `502 PROVIDER_ERROR`.
+  - `fx-current SGD→VND` control: `200`.
+  - `fx-history AUD→VND`: `200`, USD cross-rate, with valid observations.
+  - `fx-history THB→VND`: `200`, USD cross-rate.
+  - `/api/health`: `200`, `ok: true`.
+
+- **Ruled out:**
+  - Quota: the daily-limit text maps to `503 PROVIDER_RATE_LIMIT`, not `502`.
+  - Transient outage: it fails every time for these two pairs while SGD→VND works.
+  - History / cross-rate derivation: it succeeds for the same pairs.
+  - Client mapping: the client just shows the backend's code and message. A partial result was never thrown away because the current rate fails first.
+  - Retry/cache: failures aren't cached, and the one-second burst retry isn't involved.
+
+- **What `502 PROVIDER_ERROR` narrows it to:** Alpha Vantage answered the AUD→VND and THB→VND quote requests without a usable rate. The exact upstream wording is not proven because the backend strips provider text; a transport-level error is possible but less consistent with the repeatable pair-specific behavior.
+
+**Root cause found:** the failure is in the direct current quote for AUD→VND and THB→VND. History for the same pairs works because it goes through USD.
+
+**Argument against a superficial repair:** Changing only the user-facing error text would improve recovery messaging but would leave a supported pair unnecessarily broken. Retrying the same direct pair would also not address the repeatable pair-specific failure.
+
+**Smallest defensible repair:** Use the same USD cross-rate route for the current quote only when the direct quote returns no usable rate. Keep transient provider failures and rate-limit failures distinct rather than hiding them behind the fallback.
+
+**SAFE TO PROCEED:** current rate can use the USD route that history already uses. If that route also fails, show a specific recovery state instead of a generic provider error.
+
+---
+
+## Bug #3 — Missing timestamp / freshness
+
+### Coding-agent argument against the proposed repair
+
+I checked what the timestamp actually means on each path before writing any wording:
+
+1. **What `lastRefreshed` means**
+   - Alpha Vantage (VND pairs): Alpha Vantage's own last-refreshed time for the quote.
+   - USD cross-rate from Bug #2: the older of its two quote times.
+   - Frankfurter (other pairs): the date of the reference rate, with no time of day.
+2. **Whose time is it?** It is the provider's observation time on every path, never the server's fetch time or cache time.
+3. **Time zone**
+   - Alpha Vantage states UTC.
+   - Frankfurter gives no zone, but it only supplies a date.
+   - The cross-rate carries a zone only when both quotes agree; otherwise it has none.
+4. **Cross-rate timestamp:** it keeps the older of the two quote times.
+5. **Caching:** the CDN can serve a cached rate. The timestamp is stored inside the response, so it still shows the rate's observation age. Therefore `as of [provider time]` is honest; `Retrieved at` would be misleading.
+6. **Backend changes needed:** none. The client type already carries `lastRefreshed` and `timeZone`.
+7. **Market open/closed:** nothing in the data proves whether a market is open.
+8. **Wording:** `Live` is unsupported because a cached rate can be hours old. `Last close` would also be wrong because these are refresh/reference times, not necessarily closes.
+
+**Argument against overclaiming:** Do not label the result `Live`, `Real-time`, `Retrieved at`, `Last close`, or infer market status from data that does not prove those claims.
+
+**SAFE TO PROCEED:** this is a display-only fix. Use `Rate as of …` at whatever precision the provider actually gives.
+
+---
+
+## Bug #4 — Bare percentage lacks context
+
+### Coding-agent argument against the proposed repair
+
+I checked the calculation and the card before changing anything:
+
+1. The percentage is `(current − benchmark) / benchmark × 100`, calculated in `calculateComparison`.
+2. The formula is already correct.
+3. It uses the displayed direction introduced in Bug #1: `1 FROM = X TO`.
+4. Switching between 7-day and 30-day already passes the selected benchmark correctly and does not require a refetch.
+5. Only the **size** of the percentage was displayed directly; direction lived mainly in evaluative words such as `more / less favorable`.
+6. The benchmark row shows a rate, but the card did not explicitly tell a non-finance user that the percentage was measured against that selected benchmark.
+7. The page already had enough factual information to explain the percentage: sign, size, benchmark name and unchanged state.
+8. Labels such as `small`, `typical`, `large`, `normal` or `unusual` would require evidence about the pair's normal volatility, which the product does not have.
+9. Those labels would therefore add interpretation/advice the available data cannot support.
+
+**Argument against an overreaching repair:** Do not solve a missing-basis problem by inventing qualitative market labels.
+
+**SAFE TO PROCEED:** add a neutral factual context line using only existing data: percentage direction plus the named 7-day or 30-day benchmark.
+
+---
+
+## Bug #5 — Benchmark observation count / window
+
+### Coding-agent argument against the proposed repair
+
+I checked how the benchmark metadata is produced before writing anything:
+
+1. `computeBenchmarks` in `api/_lib/crossrate.js` already produces `observationCount`, `startDate` and `endDate` for both benchmarks. `/api/fx-history` returns them.
+2. The data already exists in the browser in `history.benchmarks[benchmark]`. `DecisionResult` already reads it, but only for the collapsed calculation details.
+3. `7-day` means a **7-calendar-day window**, not seven observations. The window ends on the latest observation before today; `startDate = endDate − 6 days`. The 30-day window uses `endDate − 29 days`.
+4. Today is intentionally excluded; only observations dated before today in UTC count.
+5. Weekends and missing days are not fabricated. The average uses only real observations and divides by the actual count.
+6. Five observations in a seven-calendar-day window can therefore be legitimate.
+7. The 30-day benchmark has the same presentation issue.
+8. The backend normally sends the metadata, but the client validates mainly that the average is numeric, so the UI still needs a truthful fallback for incomplete metadata.
+9. No recalculation is required. This can be fixed entirely in display logic.
+
+**Argument against changing benchmark mathematics:** The finding is about hidden metadata, not about whether the benchmark formula itself should change.
+
+A separate mathematical issue had already been identified in Bug #1:
+- `1 / average(rate)` is not necessarily equal to `average(1 / rate)`.
+
+That question is explicitly out of scope here.
+
+**SAFE TO PROCEED:** expose the actual observation count and calendar window already computed by the backend. Preserve benchmark values, observation selection and above/below outcomes.
+
+---
+
+## Bug #6 — “Favourable / better” wording
+
+### Coding-agent argument against the proposed repair
+
+Before changing anything I checked what the old wording was tied to:
+
+1. Strings using `better / favorable` included:
+   - Pill: `Better for converting X to Y` / `Less favorable for converting X to Y` / `Approximately unchanged for converting X to Y`.
+   - Headline: `X% more favorable today` / `X% less favorable today` / `Approximately unchanged today`.
+2. Both appeared in the primary result card.
+3. The non-displayed explanation used `higher / lower`; collapsed calculation details did not rely on `favorable`.
+4. Styling was also tied to the verdict:
+   - card green when above, amber when below, grey when unchanged;
+   - check icon when above and alert icon when below;
+   - trend dot used the same state.
+5. The wording can change without changing any rate, benchmark, percentage or state value because strings are constructed after calculations.
+6. Existing tests checked the old copy word-for-word, so expected strings would need updating even though numeric/state assertions remain the same.
+7. Bug #4 already supplied the factual meaning. For example:
+   - old headline: `0.22% more favorable today`
+   - Bug #4 context: `Today's rate is 0.22% above the 7-day average.`
+   The percentage was therefore duplicated; the headline contributed mainly the judgment.
+8. The disclaimer that BetterRate provides comparison information and is not financial advice remains appropriate.
+9. Even after wording changes, green/amber colors and the hero question `Is today's rate better for you?` could still carry evaluative framing. Those broader redesign questions are separate from the result-card wording repair.
+
+**Argument against changing the calculation:** The problem is not that the numbers are wrong. It is that the result copy turns a benchmark comparison into a broader verdict that ignores fees, amount, timing and user goals.
+
+**SAFE TO PROCEED:** change result wording and explicit good/bad icons only; preserve internal thresholds, state and calculations.
+
+---
+
+## Bug #7 — CTA / result auto-update inconsistency
+
+### Coding-agent argument against the proposed repair
+
+From reading the code:
+
+1. **After the first comparison**
+   - 7-day ↔ 30-day: `SET_BENCHMARK` changes only the selection. The result is recalculated from history already loaded, which contains both benchmarks. No network request.
+   - Swap: the market pair is the same, so loaded data is retained and the result recalculates in the reversed direction. No request.
+   - Different pair, e.g. WANT→AUD: loaded data is cleared, state returns to idle, any old in-flight response is ignored, and the result disappears.
+2. Benchmark switch and swap therefore recompute from loaded data, while a new pair clears the result.
+3. Only the Compare button fetches data.
+4. Pressing the button again after success does make a request, but server caching means it usually returns the same values. Calling that action `Refresh` would therefore imply a freshness guarantee that is not true.
+5. The existing architecture already follows **Option B: update automatically after the first comparison** for benchmark and swap. New pairs correctly behave as explicit submit because new data is needed.
+6. The smallest consistent repair is to keep that architecture and remove the button's implication that another click is required while a current result is already valid.
+7. Forcing a request on every benchmark switch — Option A — would add unnecessary network calls/loading for data already held and would consume more provider quota.
+8. Removing the Compare button completely would make the first comparison unclear; it is still needed before any result exists and after changing to a new pair.
+9. Stale old-pair results are already prevented when the pair changes.
+10. This can remain a screen-level interaction fix; provider/calculation behavior does not need to change.
+
+**Chosen interaction model:** Option B, live update after the first successful comparison.
+
+- `Compare today's rate` fetches the first result for a pair.
+- While a valid result is shown, benchmark changes and swaps update directly.
+- Replace the CTA with an explanatory note in that state.
+- Choosing a different pair clears the result and brings the CTA back.
+
+**Important alternatives rejected:**
+- Do not rename the existing action to `Refresh`; freshness is not guaranteed.
+- Do not refetch on every benchmark switch.
+- Do not remove the first-use/new-pair CTA.
+
+---
+
+## Bug #8 — Back / shareable comparison state
+
+### Coding-agent argument against the proposed repair
+
+What I found before coding:
+
+1. There is no React Router or equivalent.
+2. There was no URL-state handling: nothing read or wrote `window.location`, `pushState`, `replaceState` or `popstate`.
+3. The minimum state needed to reproduce comparison intent is:
+   - I HAVE currency,
+   - I WANT currency,
+   - benchmark.
+4. Rates, benchmark values, percentages, timestamps, provider history and errors should **not** be serialized into the URL.
+5. `have + want + benchmark` is sufficient.
+6. A valid shared URL can safely auto-load using the existing fetch path.
+7. That does not break Bug #7: a comparison URL represents an already-requested comparison intent, while a normal blank visit still requires the CTA.
+8. Invalid parameters should reject the comparison state rather than produce partial/undefined input.
+9. `have === want` is invalid.
+10. A valid shared URL can still encounter provider failure; that should use the existing Bug #2 recovery UI while leaving the requested valid URL intact.
+11. Browser Back/Forward can be implemented with native `popstate`; a router is not required.
+12. Adding React Router would introduce an unnecessary dependency for this one-page app.
+13. Meaningful shown comparison states should enter history: first completed comparison, benchmark switch and swap. An unsubmitted new pair should not pretend to be a completed comparison URL.
+14. Avoid URL/state loops by writing history only when a shown result differs from the canonical URL; `popstate` restores state but does not push another entry.
+15. Existing request-ID/pair checks can protect against stale responses after history navigation.
+
+**Risk found:** React StrictMode runs effects twice in development. The auto-load flow therefore needs idempotent request handling; request IDs must advance immediately so the second valid load is not ignored.
+
+**Argument against overengineering:** Do not add a routing library or serialize numeric result data. The URL should encode only comparison intent.
+
+**SAFE TO PROCEED:** use native `URLSearchParams`, `history.pushState` / `replaceState` and `popstate`, with validation and duplicate-entry prevention.
+
+---
+
+## Bug #10 — Decimal formatting consistency
+
+### Coding-agent argument against the proposed repair
+
+What I found before changing anything:
+
+1. Today's rate used `formatRate(result.todayRate)` in `DecisionResult.tsx`, including the calculation details.
+2. The benchmark used the same `formatRate(result.benchmarkRate)`.
+3. Difference used `formatRate(Math.abs(today − benchmark))`.
+4. The inconsistency came from the shared formatter choosing precision from **each number's own magnitude** and removing trailing zeros:
+   - under `0.01`: roughly four significant digits;
+   - under `10`: up to four decimals;
+   - otherwise: up to two decimals, with whole-number zeros dropped.
+5. Therefore one card could show values such as `5.6812` next to `5.659`, or `0.00004890` next to `0.0000491`; Difference could use a third precision because it is much smaller.
+6. Forcing every value to two decimals is not safe: VND→SGD would display as `0.00` and meaningful small differences would disappear, undoing the quote-direction work.
+7. VND→SGD needs about eight decimal places in typical cases to keep roughly four significant digits.
+8. A single precision policy can be chosen **per displayed pair**, using the benchmark rate as a stable reference, and applied to both current and benchmark values. That changes presentation only.
+9. No backend or calculation change is required.
+10. The affected display surfaces are the main result card, calculation details and trend chart; regression tests that assert exact formatted strings also need updates.
+
+**Argument against the naive repair:** Uniform global decimal count is not equivalent to consistency. A fixed two-decimal policy would destroy information for small reciprocal rates.
+
+**SAFE TO PROCEED:** use one pair-aware rate precision, while allowing Difference to use additional decimals if necessary to prevent a meaningful non-zero difference from rounding to zero.
+
+---
+
+## Scope-decision notes for Findings #9 and #11
+
+These were not implemented as code repairs, so they did not produce repair commits. Keep their decision rationale in `adversarial_collaboration.md`.
+
+### Finding #9 — Favourites / reminders / export
+Decision: **DO NOT IMPLEMENT — PRODUCT EXPANSION.**
+
+The capability absence was confirmed, but favourites, alerts, export and multi-pair analysis would add persistent storage, account/contact identity, scheduled jobs/notifications, search history/file generation and/or a new dashboard. BetterRate's current job remains a single-pair comparison, and Bug #8 already supplies a lightweight repeat-use shortcut through bookmarkable/shareable URLs.
+
+### Finding #11 — “Check another rate”
+Decision: **DO NOT IMPLEMENT — KEEP EXISTING NAVIGATION SHORTCUT.**
+
+Although it overlaps with changing the pair directly, `Check another rate` still gives users at the bottom of the one-page result flow a direct way back to the input area, especially on mobile. Removing it would simplify one control but remove that navigation convenience.
+
+---
+
+## One-line traceability to commits
+
+- Bug #1 → `322e1f3` — Fix exchange-rate quote direction
+- Bug #2 → `71985c7` — Fix FX provider failure recovery
+- Bug #3 → `782b8d4` — Show rate freshness in result card
+- Bug #4 → `1c95043` — Clarify percentage comparison context
+- Bug #5 → `0238137` — Clarify benchmark observation window
+- Bug #6 → `6af5f40` — Use neutral benchmark comparison wording
+- Bug #7 → `670b767` — Align comparison CTA with result updates
+- Bug #8 → `ec49f04` — Add shareable comparison URL state
+- Finding #9 → no code commit
+- Bug #10 → `94a8157` — Standardize rate display precision
+- Finding #11 → no code commit
+
