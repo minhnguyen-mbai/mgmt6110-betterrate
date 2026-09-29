@@ -2725,8 +2725,6 @@ PARTLY. The disclaimer sets a general expectation that this is information and n
 
 # PS4 — Coding Agent Arguments Against Repairs
 
-> **Source note:** Sections for Bugs #2–#8 and #10 below reproduce the substance of the coding-agent argument/counterargument outputs preserved in the working logs. The original verbatim pre-code argument for Bug #1 was not present in the available pasted logs, so Bug #1 is explicitly marked as a faithful reconstruction from the recorded scope decision. If the original Bug #1 Claude exchange is still available, replace that subsection with the verbatim response.
-
 ---
 
 ## Bug #1 — Quote direction mismatch
